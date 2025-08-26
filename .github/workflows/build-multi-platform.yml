@@ -1,0 +1,105 @@
+name: Build Multi-Platform Binaries
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  build-macos-intel:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.32.0'
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Setup Dart
+        uses: dart-lang/setup-dart@v1
+      - name: Build macOS Intel
+        run: dart compile exe bin/main.dart -o api_tool_macos_intel
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: api_tool_macos_intel
+          path: api_tool_macos_intel
+
+  build-macos-arm64:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.32.0'
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Setup Dart
+        uses: dart-lang/setup-dart@v1
+      - name: Build macOS ARM64
+        run: dart compile exe bin/main.dart -o api_tool_macos_arm64 --target-os=macos --target-arch=arm64
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: api_tool_macos_arm64
+          path: api_tool_macos_arm64
+
+  build-linux-x64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.32.0'
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Setup Dart
+        uses: dart-lang/setup-dart@v1
+      - name: Build Linux x64
+        run: dart compile exe bin/main.dart -o api_tool_linux
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: api_tool_linux
+          path: api_tool_linux
+
+  build-windows-x64:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.32.0'
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Setup Dart
+        uses: dart-lang/setup-dart@v1
+      - name: Build Windows x64
+        run: dart compile exe bin/main.dart -o api_tool_windows
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: api_tool_windows
+          path: api_tool_windows
+
+  comment-on-pr:
+    needs: [build-macos-intel, build-macos-arm64, build-linux-x64, build-windows-x64]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+      - name: Create PR Comment
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            ✅ 编译完成，产物如下：
+            - [api_tool_macos_intel](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            - [api_tool_macos_arm64](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            - [api_tool_linux](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            - [api_tool_windows](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
