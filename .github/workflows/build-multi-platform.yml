@@ -7,6 +7,9 @@ on:
 jobs:
   build-macos-intel:
     runs-on: macos-latest
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      artifact_url: ${{ steps.upload.outputs.artifact-url }}
     steps:
       - uses: actions/checkout@v4
       - name: Setup Flutter
@@ -20,6 +23,7 @@ jobs:
       - name: Build macOS Intel
         run: dart compile exe bin/main.dart -o api_tool_macos_intel
       - name: Upload Artifact
+        id: upload
         uses: actions/upload-artifact@v4
         with:
           name: api_tool_macos_intel
@@ -27,6 +31,9 @@ jobs:
 
   build-macos-arm64:
     runs-on: macos-latest
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      artifact_url: ${{ steps.upload.outputs.artifact-url }}
     steps:
       - uses: actions/checkout@v4
       - name: Setup Flutter
@@ -40,6 +47,7 @@ jobs:
       - name: Build macOS ARM64
         run: dart compile exe bin/main.dart -o api_tool_macos_arm64 --target-os=macos --target-arch=arm64
       - name: Upload Artifact
+        id: upload
         uses: actions/upload-artifact@v4
         with:
           name: api_tool_macos_arm64
@@ -47,6 +55,9 @@ jobs:
 
   build-linux-x64:
     runs-on: ubuntu-latest
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      artifact_url: ${{ steps.upload.outputs.artifact-url }}
     steps:
       - uses: actions/checkout@v4
       - name: Setup Flutter
@@ -60,6 +71,7 @@ jobs:
       - name: Build Linux x64
         run: dart compile exe bin/main.dart -o api_tool_linux
       - name: Upload Artifact
+        id: upload
         uses: actions/upload-artifact@v4
         with:
           name: api_tool_linux
@@ -67,6 +79,9 @@ jobs:
 
   build-windows-x64:
     runs-on: windows-latest
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      artifact_url: ${{ steps.upload.outputs.artifact-url }}
     steps:
       - uses: actions/checkout@v4
       - name: Setup Flutter
@@ -80,6 +95,7 @@ jobs:
       - name: Build Windows x64
         run: dart compile exe bin/main.dart -o api_tool_windows
       - name: Upload Artifact
+        id: upload
         uses: actions/upload-artifact@v4
         with:
           name: api_tool_windows
@@ -89,17 +105,13 @@ jobs:
     needs: [build-macos-intel, build-macos-arm64, build-linux-x64, build-windows-x64]
     runs-on: ubuntu-latest
     steps:
-      - name: Download Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: ./artifacts
       - name: Create PR Comment
         uses: peter-evans/create-or-update-comment@v4
         with:
           issue-number: ${{ github.event.pull_request.number }}
           body: |
             ✅ 编译完成，产物如下：
-            - [api_tool_macos_intel](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
-            - [api_tool_macos_arm64](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
-            - [api_tool_linux](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
-            - [api_tool_windows](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            - [api_tool_macos_intel](${{ needs.build-macos-intel.outputs.artifact_url }}) (ID: ${{ needs.build-macos-intel.outputs.artifact_id }})
+            - [api_tool_macos_arm64](${{ needs.build-macos-arm64.outputs.artifact_url }}) (ID: ${{ needs.build-macos-arm64.outputs.artifact_id }})
+            - [api_tool_linux](${{ needs.build-linux-x64.outputs.artifact_url }}) (ID: ${{ needs.build-linux-x64.outputs.artifact_id }})
+            - [api_tool_windows](${{ needs.build-windows-x64.outputs.artifact_url }}) (ID: ${{ needs.build-windows-x64.outputs.artifact_id }})
