@@ -105,13 +105,23 @@ jobs:
     needs: [build-macos-intel, build-macos-arm64, build-linux-x64, build-windows-x64]
     runs-on: ubuntu-latest
     steps:
-      - name: Create PR Comment
+      - name: Find Comment
+        id: find-comment
+        uses: peter-evans/find-comment@v3
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: 'github-actions[bot]'
+          body-includes: 编译完成，产物如下
+      
+      - name: Create or Update PR Comment
         uses: peter-evans/create-or-update-comment@v4
         with:
+          comment-id: ${{ steps.find-comment.outputs.comment-id }}
           issue-number: ${{ github.event.pull_request.number }}
           body: |
             ✅ 编译完成，产物如下：
-            - [api_tool_macos_intel](${{ needs.build-macos-intel.outputs.artifact_url }}) (ID: ${{ needs.build-macos-intel.outputs.artifact_id }})
-            - [api_tool_macos_arm64](${{ needs.build-macos-arm64.outputs.artifact_url }}) (ID: ${{ needs.build-macos-arm64.outputs.artifact_id }})
-            - [api_tool_linux](${{ needs.build-linux-x64.outputs.artifact_url }}) (ID: ${{ needs.build-linux-x64.outputs.artifact_id }})
-            - [api_tool_windows](${{ needs.build-windows-x64.outputs.artifact_url }}) (ID: ${{ needs.build-windows-x64.outputs.artifact_id }})
+            - [api_tool_macos_intel](${{ needs.build-macos-intel.outputs.artifact_url }})
+            - [api_tool_macos_arm64](${{ needs.build-macos-arm64.outputs.artifact_url }}) 
+            - [api_tool_linux](${{ needs.build-linux-x64.outputs.artifact_url }})
+            - [api_tool_windows](${{ needs.build-windows-x64.outputs.artifact_url }})
+          edit-mode: replace 
