@@ -1,0 +1,127 @@
+name: Build Multi-Platform Binaries
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  build-macos-intel:
+    runs-on: macos-latest
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      artifact_url: ${{ steps.upload.outputs.artifact-url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.32.0'
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Setup Dart
+        uses: dart-lang/setup-dart@v1
+      - name: Build macOS Intel
+        run: dart compile exe bin/main.dart -o api_tool_macos_intel
+      - name: Upload Artifact
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: api_tool_macos_intel
+          path: api_tool_macos_intel
+
+  build-macos-arm64:
+    runs-on: macos-latest
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      artifact_url: ${{ steps.upload.outputs.artifact-url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.32.0'
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Setup Dart
+        uses: dart-lang/setup-dart@v1
+      - name: Build macOS ARM64
+        run: dart compile exe bin/main.dart -o api_tool_macos_arm64 --target-os=macos --target-arch=arm64
+      - name: Upload Artifact
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: api_tool_macos_arm64
+          path: api_tool_macos_arm64
+
+  build-linux-x64:
+    runs-on: ubuntu-latest
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      artifact_url: ${{ steps.upload.outputs.artifact-url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.32.0'
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Setup Dart
+        uses: dart-lang/setup-dart@v1
+      - name: Build Linux x64
+        run: dart compile exe bin/main.dart -o api_tool_linux
+      - name: Upload Artifact
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: api_tool_linux
+          path: api_tool_linux
+
+  build-windows-x64:
+    runs-on: windows-latest
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      artifact_url: ${{ steps.upload.outputs.artifact-url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.32.0'
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Setup Dart
+        uses: dart-lang/setup-dart@v1
+      - name: Build Windows x64
+        run: dart compile exe bin/main.dart -o api_tool_windows
+      - name: Upload Artifact
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: api_tool_windows
+          path: api_tool_windows
+
+  comment-on-pr:
+    needs: [build-macos-intel, build-macos-arm64, build-linux-x64, build-windows-x64]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Find Comment
+        id: find-comment
+        uses: peter-evans/find-comment@v3
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: 'github-actions[bot]'
+          body-includes: 编译完成，产物如下
+      
+      - name: Create or Update PR Comment
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          comment-id: ${{ steps.find-comment.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            ✅ 编译完成，产物如下：
+            - [api_tool_macos_intel](${{ needs.build-macos-intel.outputs.artifact_url }})
+            - [api_tool_macos_arm64](${{ needs.build-macos-arm64.outputs.artifact_url }}) 
+            - [api_tool_linux](${{ needs.build-linux-x64.outputs.artifact_url }})
+            - [api_tool_windows](${{ needs.build-windows-x64.outputs.artifact_url }})
+          edit-mode: replace 
