@@ -64,18 +64,111 @@ class SmartCreator {
         print(pen('输入的文件夹路径不对: $fullPath'));
       }
     }
-    int startTime = DateTime.now().microsecondsSinceEpoch;
+  int startTime = DateTime.now().microsecondsSinceEpoch;
     // print('${DateTime.now().toLocal()}  AnalysisContextCollection');]
     var sb = StringBuffer();
     files.forEach((element) {
       sb.write("path:$element   \n");
     });
-    AnalysisContextCollection analysisContextCollection = AnalysisContextCollection(
-      includedPaths: files,
-      excludedPaths: [],
-      resourceProvider: PhysicalResourceProvider.INSTANCE,
-    );
+    // try to detect Dart SDK robustly (async): prefer env, flutter cache, 'where'/'which', then walk up from resolvedExecutable
+    String? sdkPath = await _detectSdkPath();
+    if (sdkPath != null && sdkPath.isNotEmpty) {
+      AnsiPen pen = AnsiPen()..green(bold: true);
+      print(pen('Detected Dart SDK: $sdkPath'));
+    } else {
+      AnsiPen pen = AnsiPen()..yellow(bold: true);
+      print(pen('Warning: Could not auto-detect Dart SDK. Analyzer may fail in compiled binary.'));
+    }
+
+    // If sdkPath is not found, omit sdkPath and let the analyzer attempt default discovery (may fail for compiled exe).
+    AnalysisContextCollection analysisContextCollection = (sdkPath != null && sdkPath.isNotEmpty)
+        ? AnalysisContextCollection(
+            includedPaths: files,
+            excludedPaths: [],
+            resourceProvider: PhysicalResourceProvider.INSTANCE,
+            sdkPath: sdkPath,
+          )
+        : AnalysisContextCollection(
+            includedPaths: files,
+            excludedPaths: [],
+            resourceProvider: PhysicalResourceProvider.INSTANCE,
+          );
     return analyseFile(analysisContextCollection, files, startTime);
+  }
+
+  // Attempt to detect Dart SDK path using multiple strategies:
+  // 1) DART_SDK env
+  // 2) FLUTTER_ROOT/FLUTTER_HOME -> bin/cache/dart-sdk
+  // 3) run 'where dart' (Windows) or 'which dart' (posix) and inspect parent dirs
+  // 4) walk up from Platform.resolvedExecutable looking for 'lib/_internal'
+  Future<String?> _detectSdkPath() async {
+    // 1) env
+    String? sdkPath = Platform.environment['DART_SDK'];
+    if (sdkPath != null && sdkPath.isNotEmpty) {
+      return normalize(sdkPath);
+    }
+
+    // 2) flutter env
+    final flutterRoot = Platform.environment['FLUTTER_ROOT'] ?? Platform.environment['FLUTTER_HOME'];
+    if (flutterRoot != null && flutterRoot.isNotEmpty) {
+      final candidate = normalize(join(flutterRoot, 'bin', 'cache', 'dart-sdk'));
+      if (Directory(candidate).existsSync()) return candidate;
+    }
+
+    // 3) find 'dart' executable using platform tools
+    try {
+      if (Platform.isWindows) {
+        var result = await Process.run('where.exe', ['dart']);
+        if (result.exitCode == 0) {
+          final lines = result.stdout.toString().trim().split(RegExp(r"\r?\n"));
+          if (lines.isNotEmpty) {
+            final dartExe = lines.first.trim();
+            final binDir = dirname(dartExe);
+            final parent = dirname(binDir);
+            // check for flutter cached sdk
+            final flutterCache = normalize(join(parent, 'bin', 'cache', 'dart-sdk'));
+            if (Directory(flutterCache).existsSync()) return flutterCache;
+            // check for lib/_internal
+            final internal = normalize(join(parent, 'lib', '_internal'));
+            if (Directory(internal).existsSync()) return parent;
+            return parent;
+          }
+        }
+      } else {
+        var result = await Process.run('which', ['dart']);
+        if (result.exitCode == 0) {
+          final dartExe = result.stdout.toString().trim();
+          if (dartExe.isNotEmpty) {
+            final binDir = dirname(dartExe);
+            final parent = dirname(binDir);
+            final internal = normalize(join(parent, 'lib', '_internal'));
+            if (Directory(internal).existsSync()) return parent;
+            return parent;
+          }
+        }
+      }
+    } catch (e) {
+      // ignore failures
+    }
+
+    // 4) walk up from resolvedExecutable
+    try {
+      String exec = Platform.resolvedExecutable;
+      String dir = normalize(dirname(exec));
+      for (int i = 0; i < 8; i++) {
+        final candidate = normalize(join(dir, 'lib', '_internal'));
+        if (Directory(candidate).existsSync()) {
+          return normalize(dirname(candidate));
+        }
+        final parent = dirname(dir);
+        if (parent == dir) break;
+        dir = parent;
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    return null;
   }
 
   Future<void> analyseFile(AnalysisContextCollection analysisContextCollection, List<String> paths, int startTime) async {
@@ -286,7 +379,6 @@ class ${componentInfo!.name}Demo1 extends StatelessWidget {
 
   // 拷贝默认的组件封面图
   Future<void> copyCoverFile(ComponentInfo? componentInfo) async {
-    int startTime = DateTime.now().microsecondsSinceEpoch;
     String? destName = getDestFolderName(componentInfo);
     String relativePath = getWidgetDirPath(destName);
     String path = join(basePath!, relativePath);
