@@ -24,6 +24,9 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE
           git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
+          mkdir -p tdesign-flutter/tdesign-component/demo_tool/bin
+          cp api_tool_macos_intel tdesign-flutter/tdesign-component/demo_tool/bin/api_tool_linux
+          chmod +x tdesign-flutter/tdesign-component/demo_tool/bin/api_tool_linux
           cd tdesign-flutter/tdesign-component/demo_tool
           sh all_build.sh
       - name: Upload Artifact
@@ -52,6 +55,9 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE
           git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
+          mkdir -p tdesign-flutter/tdesign-component/demo_tool/bin
+          cp api_tool_macos_arm64 tdesign-flutter/tdesign-component/demo_tool/bin/api_tool_linux
+          chmod +x tdesign-flutter/tdesign-component/demo_tool/bin/api_tool_linux
           cd tdesign-flutter/tdesign-component/demo_tool
           sh all_build.sh
       - name: Upload Artifact
@@ -80,6 +86,9 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE
           git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
+          mkdir -p tdesign-flutter/tdesign-component/demo_tool/bin
+          cp api_tool_linux tdesign-flutter/tdesign-component/demo_tool/bin/api_tool_linux
+          chmod +x tdesign-flutter/tdesign-component/demo_tool/bin/api_tool_linux
           cd tdesign-flutter/tdesign-component/demo_tool
           sh all_build.sh
       - name: Upload Artifact
@@ -109,6 +118,8 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE
           git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
+          mkdir -p tdesign-flutter/tdesign-component/demo_tool/bin
+          cp api_tool_windows.exe tdesign-flutter/tdesign-component/demo_tool/bin/api_tool_linux.exe
           cd tdesign-flutter/tdesign-component/demo_tool
           sh all_build.sh
       - name: Upload Artifact
