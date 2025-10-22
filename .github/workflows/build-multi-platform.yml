@@ -25,9 +25,9 @@ jobs:
           cd $GITHUB_WORKSPACE
           git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
           mkdir -p tdesign-flutter/tdesign-component/demo_tool/bin
-          cp api_tool_macos_intel tdesign-flutter/tdesign-component/demo_tool/bin/api_tool_linux
-          chmod +x tdesign-flutter/tdesign-component/demo_tool/bin/api_tool_linux
+          cp api_tool_macos_intel tdesign-flutter/tdesign-component/demo_tool/bin/
           cd tdesign-flutter/tdesign-component/demo_tool
+          sed -i.bak 's|./bin/api_tool_linux|./bin/api_tool_macos_intel|g' all_build.sh
           sh all_build.sh
       - name: Upload Artifact
         id: upload
@@ -56,9 +56,9 @@ jobs:
           cd $GITHUB_WORKSPACE
           git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
           mkdir -p tdesign-flutter/tdesign-component/demo_tool/bin
-          cp api_tool_macos_arm64 tdesign-flutter/tdesign-component/demo_tool/bin/api_tool_linux
-          chmod +x tdesign-flutter/tdesign-component/demo_tool/bin/api_tool_linux
+          cp api_tool_macos_arm64 tdesign-flutter/tdesign-component/demo_tool/bin/
           cd tdesign-flutter/tdesign-component/demo_tool
+          sed -i.bak 's|./bin/api_tool_linux|./bin/api_tool_macos_arm64|g' all_build.sh
           sh all_build.sh
       - name: Upload Artifact
         id: upload
@@ -87,7 +87,7 @@ jobs:
           cd $GITHUB_WORKSPACE
           git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
           mkdir -p tdesign-flutter/tdesign-component/demo_tool/bin
-          cp api_tool_linux tdesign-flutter/tdesign-component/demo_tool/bin/api_tool_linux
+          cp api_tool_linux tdesign-flutter/tdesign-component/demo_tool/bin/
           chmod +x tdesign-flutter/tdesign-component/demo_tool/bin/api_tool_linux
           cd tdesign-flutter/tdesign-component/demo_tool
           sh all_build.sh
@@ -119,8 +119,9 @@ jobs:
           cd $GITHUB_WORKSPACE
           git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
           mkdir -p tdesign-flutter/tdesign-component/demo_tool/bin
-          cp api_tool_windows.exe tdesign-flutter/tdesign-component/demo_tool/bin/api_tool_linux.exe
+          cp api_tool_windows tdesign-flutter/tdesign-component/demo_tool/bin/
           cd tdesign-flutter/tdesign-component/demo_tool
+          sed -i.bak 's|./bin/api_tool_linux|./bin/api_tool_windows|g' all_build.sh
           sh all_build.sh
       - name: Upload Artifact
         id: upload
