@@ -26,6 +26,7 @@ jobs:
           git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
           mkdir -p tdesign-flutter/tdesign-component/demo_tool/bin
           cp api_tool_macos_intel tdesign-flutter/tdesign-component/demo_tool/bin/
+          chmod +x tdesign-flutter/tdesign-component/demo_tool/bin/api_tool_macos_intel
           cd tdesign-flutter/tdesign-component/demo_tool
           sed -i.bak 's|./bin/api_tool_linux|./bin/api_tool_macos_intel|g' all_build.sh
           sh all_build.sh
@@ -57,6 +58,7 @@ jobs:
           git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
           mkdir -p tdesign-flutter/tdesign-component/demo_tool/bin
           cp api_tool_macos_arm64 tdesign-flutter/tdesign-component/demo_tool/bin/
+          chmod +x tdesign-flutter/tdesign-component/demo_tool/bin/api_tool_macos_arm64
           cd tdesign-flutter/tdesign-component/demo_tool
           sed -i.bak 's|./bin/api_tool_linux|./bin/api_tool_macos_arm64|g' all_build.sh
           sh all_build.sh
