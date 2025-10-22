@@ -18,8 +18,6 @@ jobs:
           flutter-version: '3.32.0'
       - name: Install dependencies
         run: flutter pub get
-      - name: Setup Dart
-        uses: dart-lang/setup-dart@v1
       - name: Build macOS Intel
         run: dart compile exe bin/main.dart -o api_tool_macos_intel
       - name: Upload Artifact
@@ -42,8 +40,6 @@ jobs:
           flutter-version: '3.32.0'
       - name: Install dependencies
         run: flutter pub get
-      - name: Setup Dart
-        uses: dart-lang/setup-dart@v1
       - name: Build macOS ARM64
         run: dart compile exe bin/main.dart -o api_tool_macos_arm64 --target-os=macos --target-arch=arm64
       - name: Upload Artifact
@@ -66,10 +62,8 @@ jobs:
           flutter-version: '3.32.0'
       - name: Install dependencies
         run: flutter pub get
-      - name: Setup Dart
-        uses: dart-lang/setup-dart@v1
       - name: Build Linux x64
-        run: dart compile exe bin/main.dart -o api_tool_linux
+        run: dart compile exe bin/main.dart -o api_tool_linux --target-arch=x64
       - name: Upload Artifact
         id: upload
         uses: actions/upload-artifact@v4
@@ -90,8 +84,6 @@ jobs:
           flutter-version: '3.32.0'
       - name: Install dependencies
         run: flutter pub get
-      - name: Setup Dart
-        uses: dart-lang/setup-dart@v1
       - name: Build Windows x64
         run: dart compile exe bin/main.dart -o api_tool_windows
       - name: Upload Artifact
