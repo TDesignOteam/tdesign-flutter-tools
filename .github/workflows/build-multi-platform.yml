@@ -20,6 +20,12 @@ jobs:
         run: flutter pub get
       - name: Build macOS Intel
         run: dart compile exe bin/main.dart -o api_tool_macos_intel
+      - name: Verify with tdesign-flutter
+        run: |
+          cd $GITHUB_WORKSPACE
+          git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
+          cd tdesign-flutter/tdesign-component/demo_tool
+          sh all_build.sh
       - name: Upload Artifact
         id: upload
         uses: actions/upload-artifact@v4
@@ -42,6 +48,12 @@ jobs:
         run: flutter pub get
       - name: Build macOS ARM64
         run: dart compile exe bin/main.dart -o api_tool_macos_arm64 --target-os=macos --target-arch=arm64
+      - name: Verify with tdesign-flutter
+        run: |
+          cd $GITHUB_WORKSPACE
+          git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
+          cd tdesign-flutter/tdesign-component/demo_tool
+          sh all_build.sh
       - name: Upload Artifact
         id: upload
         uses: actions/upload-artifact@v4
@@ -64,6 +76,12 @@ jobs:
         run: flutter pub get
       - name: Build Linux x64
         run: dart compile exe bin/main.dart -o api_tool_linux --target-arch=x64
+      - name: Verify with tdesign-flutter
+        run: |
+          cd $GITHUB_WORKSPACE
+          git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
+          cd tdesign-flutter/tdesign-component/demo_tool
+          sh all_build.sh
       - name: Upload Artifact
         id: upload
         uses: actions/upload-artifact@v4
@@ -86,6 +104,13 @@ jobs:
         run: flutter pub get
       - name: Build Windows x64
         run: dart compile exe bin/main.dart -o api_tool_windows
+      - name: Verify with tdesign-flutter
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE
+          git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
+          cd tdesign-flutter/tdesign-component/demo_tool
+          sh all_build.sh
       - name: Upload Artifact
         id: upload
         uses: actions/upload-artifact@v4
