@@ -3,7 +3,7 @@
 [![Flutter Version](https://img.shields.io/badge/Flutter-%3E%3D3.32.0%20%3C4.0.0-blue.svg?logo=flutter)](https://flutter.dev/)
 [![Dart Version](https://img.shields.io/badge/Dart-%3E%3D3.0.0%20%3C4.0.0-blue.svg?logo=dart)](https://dart.dev/)
 
-TDesign Flutter 组件库文档生成工具
+[TDesign Flutter](https://github.com/Tencent/tdesign-flutter) 组件库文档生成工具
 
 > 一个用于自动生成 TDesign Flutter 组件库示例代码和 API 文档的命令行工具,基于 smart_cli。
 
