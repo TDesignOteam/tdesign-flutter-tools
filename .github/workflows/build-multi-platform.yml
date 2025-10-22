@@ -18,10 +18,18 @@ jobs:
           flutter-version: '3.32.0'
       - name: Install dependencies
         run: flutter pub get
-      - name: Setup Dart
-        uses: dart-lang/setup-dart@v1
       - name: Build macOS Intel
         run: dart compile exe bin/main.dart -o api_tool_macos_intel
+      - name: Verify with tdesign-flutter
+        run: |
+          cd $GITHUB_WORKSPACE
+          git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
+          mkdir -p tdesign-flutter/tdesign-component/demo_tool/bin
+          cp api_tool_macos_intel tdesign-flutter/tdesign-component/demo_tool/bin/
+          chmod +x tdesign-flutter/tdesign-component/demo_tool/bin/api_tool_macos_intel
+          cd tdesign-flutter/tdesign-component/demo_tool
+          sed -i.bak 's|./bin/api_tool_linux|./bin/api_tool_macos_intel|g' all_build.sh
+          sh all_build.sh
       - name: Upload Artifact
         id: upload
         uses: actions/upload-artifact@v4
@@ -42,10 +50,18 @@ jobs:
           flutter-version: '3.32.0'
       - name: Install dependencies
         run: flutter pub get
-      - name: Setup Dart
-        uses: dart-lang/setup-dart@v1
       - name: Build macOS ARM64
         run: dart compile exe bin/main.dart -o api_tool_macos_arm64 --target-os=macos --target-arch=arm64
+      - name: Verify with tdesign-flutter
+        run: |
+          cd $GITHUB_WORKSPACE
+          git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
+          mkdir -p tdesign-flutter/tdesign-component/demo_tool/bin
+          cp api_tool_macos_arm64 tdesign-flutter/tdesign-component/demo_tool/bin/
+          chmod +x tdesign-flutter/tdesign-component/demo_tool/bin/api_tool_macos_arm64
+          cd tdesign-flutter/tdesign-component/demo_tool
+          sed -i.bak 's|./bin/api_tool_linux|./bin/api_tool_macos_arm64|g' all_build.sh
+          sh all_build.sh
       - name: Upload Artifact
         id: upload
         uses: actions/upload-artifact@v4
@@ -66,10 +82,17 @@ jobs:
           flutter-version: '3.32.0'
       - name: Install dependencies
         run: flutter pub get
-      - name: Setup Dart
-        uses: dart-lang/setup-dart@v1
       - name: Build Linux x64
-        run: dart compile exe bin/main.dart -o api_tool_linux
+        run: dart compile exe bin/main.dart -o api_tool_linux --target-arch=x64
+      - name: Verify with tdesign-flutter
+        run: |
+          cd $GITHUB_WORKSPACE
+          git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
+          mkdir -p tdesign-flutter/tdesign-component/demo_tool/bin
+          cp api_tool_linux tdesign-flutter/tdesign-component/demo_tool/bin/
+          chmod +x tdesign-flutter/tdesign-component/demo_tool/bin/api_tool_linux
+          cd tdesign-flutter/tdesign-component/demo_tool
+          sh all_build.sh
       - name: Upload Artifact
         id: upload
         uses: actions/upload-artifact@v4
@@ -90,10 +113,18 @@ jobs:
           flutter-version: '3.32.0'
       - name: Install dependencies
         run: flutter pub get
-      - name: Setup Dart
-        uses: dart-lang/setup-dart@v1
       - name: Build Windows x64
         run: dart compile exe bin/main.dart -o api_tool_windows
+      - name: Verify with tdesign-flutter
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE
+          git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
+          mkdir -p tdesign-flutter/tdesign-component/demo_tool/bin
+          cp api_tool_windows tdesign-flutter/tdesign-component/demo_tool/bin/
+          cd tdesign-flutter/tdesign-component/demo_tool
+          sed -i.bak 's|./bin/api_tool_linux|./bin/api_tool_windows|g' all_build.sh
+          sh all_build.sh
       - name: Upload Artifact
         id: upload
         uses: actions/upload-artifact@v4
