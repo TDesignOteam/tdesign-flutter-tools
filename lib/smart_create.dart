@@ -238,7 +238,7 @@ class SmartCreator {
         if (parsedComponentInfoList.indexOf(apiInfo) >= 1) {
           sb.write('''```\n```\n\n''');
         }
-        sb.write(' ${apiInfo.componentInfo!.name}');
+        sb.write('### ${apiInfo.componentInfo!.name}');
         if (commandInfo?.isGetComments ?? false) {
           sb.write('\n#### 简介\n');
           sb.write('${apiInfo.componentInfo!.introduction}');
