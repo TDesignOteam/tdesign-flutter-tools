@@ -11,7 +11,7 @@ jobs:
       artifact_id: ${{ steps.upload.outputs.artifact-id }}
       artifact_url: ${{ steps.upload.outputs.artifact-url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -43,7 +43,7 @@ jobs:
       artifact_id: ${{ steps.upload.outputs.artifact-id }}
       artifact_url: ${{ steps.upload.outputs.artifact-url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -75,7 +75,7 @@ jobs:
       artifact_id: ${{ steps.upload.outputs.artifact-id }}
       artifact_url: ${{ steps.upload.outputs.artifact-url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -106,7 +106,7 @@ jobs:
       artifact_id: ${{ steps.upload.outputs.artifact-id }}
       artifact_url: ${{ steps.upload.outputs.artifact-url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
