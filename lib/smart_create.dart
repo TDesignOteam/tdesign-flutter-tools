@@ -208,6 +208,15 @@ class SmartCreator {
       List<ParsedComponentInfoInfo> items = issuesInFile.analyse();
       parsedComponentInfoList.addAll(items);
     }
+    // 按照 nameList 的顺序对解析结果进行排序，确保输出顺序与用户输入顺序一致
+    parsedComponentInfoList.sort((a, b) {
+      int indexA = nameList!.indexOf(a.componentInfo!.name!);
+      int indexB = nameList!.indexOf(b.componentInfo!.name!);
+      // 找不到的元素排到最后
+      if (indexA == -1) indexA = nameList!.length;
+      if (indexB == -1) indexB = nameList!.length;
+      return indexA.compareTo(indexB);
+    });
     await generateApiInfoFile(parsedComponentInfoList);
     if (!onlyApi! && parsedComponentInfoList.isNotEmpty) {
       await generateBaseInfoFile(parsedComponentInfoList.first.componentInfo!, commandInfo!);
