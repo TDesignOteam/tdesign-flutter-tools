@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 // import 'dart:math';
 
@@ -299,7 +300,7 @@ class SmartCreator {
         }
       }
     }
-    await file.writeAsString(sb.toString());
+    await file.writeAsString(sb.toString(), encoding: utf8);
     int endTime = DateTime.now().microsecondsSinceEpoch;
     AnsiPen pen = AnsiPen()..green(bold: true);
     print(pen('$relativePath 生成完毕!  用时: ${((endTime - startTime) / 1000).floor()}ms'));
@@ -346,7 +347,7 @@ ${sb.toString()}
 ## 介绍
 ${componentInfo.introduction}
 ''';
-    await file.writeAsString(fileContent);
+    await file.writeAsString(fileContent, encoding: utf8);
     int endTime = DateTime.now().microsecondsSinceEpoch;
     AnsiPen pen = AnsiPen()..green(bold: true);
     print(pen('${join(relativePath, '$destName.md')} 生成完毕!  用时: ${((endTime - startTime) / 1000).floor()}ms'));
@@ -379,7 +380,7 @@ class ${componentInfo!.name}Demo1 extends StatelessWidget {
   }
 }
 ''';
-      await file.writeAsString(fileContent);
+      await file.writeAsString(fileContent, encoding: utf8);
       int endTime = DateTime.now().microsecondsSinceEpoch;
       AnsiPen pen = AnsiPen()..green(bold: true);
       print(pen('${join(relativePath, 'demo1.dart')} 生成完毕!  用时: ${((endTime - startTime) / 1000).floor()}ms'));
