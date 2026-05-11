@@ -121,7 +121,8 @@ class SmartCreator {
       if (Platform.isWindows) {
         var result = await Process.run('where.exe', ['dart']);
         if (result.exitCode == 0) {
-          final lines = result.stdout.toString().trim().split(RegExp(r"\r?\n"));
+          final stdoutStr = result.stdout.toString();
+          final lines = stdoutStr.trim().split(RegExp(r"\r?\n"));
           if (lines.isNotEmpty) {
             final dartExe = lines.first.trim();
             final binDir = dirname(dartExe);
