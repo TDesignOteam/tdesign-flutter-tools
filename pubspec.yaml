@@ -1,5 +1,5 @@
 name: tdesign_flutter_tools
-description: 一个用于自动生成 TDesign Flutter 组件库示例代码和 API 文档的命令行工具,基于 smart_cli。.
+description: A CLI tool for auto-generating TDesign Flutter component examples and API docs, based on smart_cli.
 version: 0.0.1
 homepage: https://github.com/TDesignOteam/tdesign-flutter-tools
 
