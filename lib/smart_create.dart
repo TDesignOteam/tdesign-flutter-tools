@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 // import 'dart:math';
 
@@ -120,7 +121,8 @@ class SmartCreator {
       if (Platform.isWindows) {
         var result = await Process.run('where.exe', ['dart']);
         if (result.exitCode == 0) {
-          final lines = result.stdout.toString().trim().split(RegExp(r"\r?\n"));
+          final stdoutStr = result.stdout.toString();
+          final lines = stdoutStr.trim().split(RegExp(r"\r?\n"));
           if (lines.isNotEmpty) {
             final dartExe = lines.first.trim();
             final binDir = dirname(dartExe);
@@ -208,6 +210,15 @@ class SmartCreator {
       List<ParsedComponentInfoInfo> items = issuesInFile.analyse();
       parsedComponentInfoList.addAll(items);
     }
+    // 按照 nameList 的顺序对解析结果进行排序，确保输出顺序与用户输入顺序一致
+    parsedComponentInfoList.sort((a, b) {
+      int indexA = nameList!.indexOf(a.componentInfo!.name!);
+      int indexB = nameList!.indexOf(b.componentInfo!.name!);
+      // 找不到的元素排到最后
+      if (indexA == -1) indexA = nameList!.length;
+      if (indexB == -1) indexB = nameList!.length;
+      return indexA.compareTo(indexB);
+    });
     await generateApiInfoFile(parsedComponentInfoList);
     if (!onlyApi! && parsedComponentInfoList.isNotEmpty) {
       await generateBaseInfoFile(parsedComponentInfoList.first.componentInfo!, commandInfo!);
@@ -290,7 +301,7 @@ class SmartCreator {
         }
       }
     }
-    await file.writeAsString(sb.toString());
+    await file.writeAsString(sb.toString(), encoding: utf8);
     int endTime = DateTime.now().microsecondsSinceEpoch;
     AnsiPen pen = AnsiPen()..green(bold: true);
     print(pen('$relativePath 生成完毕!  用时: ${((endTime - startTime) / 1000).floor()}ms'));
@@ -337,7 +348,7 @@ ${sb.toString()}
 ## 介绍
 ${componentInfo.introduction}
 ''';
-    await file.writeAsString(fileContent);
+    await file.writeAsString(fileContent, encoding: utf8);
     int endTime = DateTime.now().microsecondsSinceEpoch;
     AnsiPen pen = AnsiPen()..green(bold: true);
     print(pen('${join(relativePath, '$destName.md')} 生成完毕!  用时: ${((endTime - startTime) / 1000).floor()}ms'));
@@ -370,7 +381,7 @@ class ${componentInfo!.name}Demo1 extends StatelessWidget {
   }
 }
 ''';
-      await file.writeAsString(fileContent);
+      await file.writeAsString(fileContent, encoding: utf8);
       int endTime = DateTime.now().microsecondsSinceEpoch;
       AnsiPen pen = AnsiPen()..green(bold: true);
       print(pen('${join(relativePath, 'demo1.dart')} 生成完毕!  用时: ${((endTime - startTime) / 1000).floor()}ms'));
