@@ -1,45 +1,20 @@
-name: Test in TDesign Flutter
+name: PREVIEW_BUILD
 
 on:
   pull_request:
     branches: [main, rss1102/*]
-  push:
-    branches: [rss1102/*]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+  pull-requests: write
 
 jobs:
-  test:
+  build:
     runs-on: ubuntu-latest
-    steps:
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.32.0'
-
-      - name: Checkout tdesign-flutter-tools
-        uses: actions/checkout@v4
-
-      - name: Install dependencies
-        run: dart pub get
-
-      - name: Build binary
-        run: dart compile exe bin/main.dart -o tdesign_flutter_tools
-
-      - name: Verify binary
-        run: |
-          git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
-          dart run .github/scripts/cross_platform_verify.dart tdesign-flutter tdesign_flutter_tools
-
-  deploy-site:
-    needs: test
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-      pull-requests: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    if: >
+      !contains(github.event.head_commit.message, '[skip ci]') &&
+      !contains(github.event.head_commit.message, '[ci skip]')
     steps:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -51,11 +26,16 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
       - name: Checkout tdesign-flutter-tools
         uses: actions/checkout@v4
 
       - name: Install tools dependencies
-        run: dart pub get
+        run: flutter pub get
 
       - name: Build binary
         run: dart compile exe bin/main.dart -o tdesign_flutter_tools
@@ -63,31 +43,40 @@ jobs:
       - name: Checkout tdesign-flutter
         run: git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
 
-      - name: Generate all API docs
+      - name: Verify binary
         run: dart run .github/scripts/cross_platform_verify.dart tdesign-flutter tdesign_flutter_tools
 
-      - name: Install site dependencies
-        working-directory: tdesign-flutter/tdesign-site
-        run: npm install --legacy-peer-deps
+      - name: Create build env
+        run: |
+          cat > build-env.txt << EOF
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          COMMIT_SHA=${{ github.event.pull_request.head.sha }}
+          EOF
+
+      - name: Upload build env
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-env
+          path: build-env.txt
+          retention-days: 5
 
       - name: Build site
         working-directory: tdesign-flutter/tdesign-site
-        run: npm run site
+        run: |
+          pnpm install --no-frozen-lockfile
+          npm run site
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Prepare web artifact
+        run: |
+          mkdir -p tdesign-flutter-web
+          cp -r tdesign-flutter/tdesign-site/_site/* tdesign-flutter-web/
+          # SPA 路由支持
+          cp tdesign-flutter-web/index.html tdesign-flutter-web/200.html
+          cp tdesign-flutter-web/index.html tdesign-flutter-web/404.html
+
+      - name: Upload web artifact
+        uses: actions/upload-artifact@v4
         with:
-          path: tdesign-flutter/tdesign-site/_site
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-
-      - name: Comment on PR
-        uses: peter-evans/create-or-update-comment@v4
-        with:
-          issue-number: ${{ github.event.pull_request.number }}
-          body: |
-            📖 文档站点预览已部署：
-            ${{ steps.deployment.outputs.page_url }}
-          edit-mode: replace
+          name: tdesign-flutter-web
+          path: tdesign-flutter-web
+          retention-days: 5

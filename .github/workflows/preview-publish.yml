@@ -1,0 +1,101 @@
+name: PREVIEW_PUBLISH
+
+on:
+  workflow_run:
+    workflows: ["PREVIEW_BUILD"]
+    types:
+      - completed
+
+jobs:
+  preview-success-web:
+    runs-on: ubuntu-latest
+    if: >
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success'
+    steps:
+      - name: Download build env
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: ${{ github.event.workflow_run.workflow_id }}
+          run_id: ${{ github.event.workflow_run.id }}
+          name: build-env
+
+      - name: Load build env
+        id: build_env
+        run: |
+          while IFS='=' read -r key value; do
+            value=$(echo "$value" | xargs)
+            echo "$key=$value" >> $GITHUB_OUTPUT
+          done < build-env.txt
+
+      - name: Download web artifact
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: ${{ github.event.workflow_run.workflow_id }}
+          run_id: ${{ github.event.workflow_run.id }}
+          name: tdesign-flutter-web
+          path: tdesign-flutter-web
+
+      - name: Deploy to Surge
+        id: deploy
+        run: |
+          repository=${{ github.repository }}
+          project_name=${repository#*/}
+          export DEPLOY_DOMAIN=https://preview-pr-${{ steps.build_env.outputs.PR_NUMBER }}-${project_name}.surge.sh
+          npx surge --project ./tdesign-flutter-web --domain $DEPLOY_DOMAIN --token ${{ secrets.TDESIGN_SURGE_TOKEN }}
+          echo "url=$DEPLOY_DOMAIN" >> $GITHUB_OUTPUT
+
+      - name: Update PR comment
+        uses: actions-cool/maintain-one-comment@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          body: |
+            <a href="${{ steps.deploy.outputs.url }}"><img height="96" alt="完成" src="https://user-images.githubusercontent.com/15634204/150816437-9f5bb788-cd67-4cbc-9897-b82d74e9aa65.png" /></a>
+
+            📖 文档站点预览: ${{ steps.deploy.outputs.url }}
+
+            <!-- AUTO_PREVIEW_HOOK -->
+          number: ${{ steps.build_env.outputs.PR_NUMBER }}
+          body-include: "<!-- AUTO_PREVIEW_HOOK -->"
+
+      - name: On failure
+        if: ${{ failure() }}
+        uses: actions-cool/maintain-one-comment@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          body: |
+            [<img height="96" alt="失败" src="https://user-images.githubusercontent.com/5378891/75333447-1e63a280-58c1-11ea-975d-235367fd1522.png">](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            <!-- AUTO_PREVIEW_HOOK -->
+          number: ${{ steps.build_env.outputs.PR_NUMBER }}
+          body-include: "<!-- AUTO_PREVIEW_HOOK -->"
+
+  preview-failed:
+    runs-on: ubuntu-latest
+    if: >
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'failure'
+    steps:
+      - name: Download build env
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: ${{ github.event.workflow_run.workflow_id }}
+          run_id: ${{ github.event.workflow_run.id }}
+          name: build-env
+
+      - name: Load build env
+        id: build_env
+        run: |
+          while IFS='=' read -r key value; do
+            value=$(echo "$value" | xargs)
+            echo "$key=$value" >> $GITHUB_OUTPUT
+          done < build-env.txt
+
+      - name: Update PR comment
+        uses: actions-cool/maintain-one-comment@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          body: |
+            [<img height="96" alt="失败" src="https://user-images.githubusercontent.com/5378891/75333447-1e63a280-58c1-11ea-975d-235367fd1522.png">](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            <!-- AUTO_PREVIEW_HOOK -->
+          number: ${{ steps.build_env.outputs.PR_NUMBER }}
+          body-include: "<!-- AUTO_PREVIEW_HOOK -->"
