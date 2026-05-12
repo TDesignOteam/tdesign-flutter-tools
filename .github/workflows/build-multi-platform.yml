@@ -24,15 +24,7 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE
           git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
-          cd tdesign-flutter/tdesign-component
-          sed -i '' "s|url: https://github.com/TDesignOteam/tdesign-flutter-tools.git|path: $GITHUB_WORKSPACE|" pubspec.yaml
-          sed -i '' "s|ref: main|ref: $GITHUB_REF|" pubspec.yaml
-          flutter pub get
-          cd demo_tool
-          sed -i '' "s|dart run tdesign_flutter_tools:main|$GITHUB_WORKSPACE/api_tool_macos_intel|g" all_build.sh
-          mkdir -p bin && cp $GITHUB_WORKSPACE/api_tool_macos_intel bin/
-          chmod +x api_tool_macos_intel bin/api_tool_macos_intel
-          sh all_build.sh
+          dart run .github/scripts/cross_platform_verify.dart tdesign-flutter api_tool_macos_intel
       - name: Upload Artifact
         id: upload
         uses: actions/upload-artifact@v4
@@ -59,15 +51,7 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE
           git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
-          cd tdesign-flutter/tdesign-component
-          sed -i '' "s|url: https://github.com/TDesignOteam/tdesign-flutter-tools.git|path: $GITHUB_WORKSPACE|" pubspec.yaml
-          sed -i '' "s|ref: main|ref: $GITHUB_REF|" pubspec.yaml
-          flutter pub get
-          cd demo_tool
-          sed -i '' "s|dart run tdesign_flutter_tools:main|$GITHUB_WORKSPACE/api_tool_macos_arm64|g" all_build.sh
-          mkdir -p bin && cp $GITHUB_WORKSPACE/api_tool_macos_arm64 bin/
-          chmod +x api_tool_macos_arm64 bin/api_tool_macos_arm64
-          sh all_build.sh
+          dart run tools/cross_platform_verify.dart tdesign-flutter api_tool_macos_arm64
       - name: Upload Artifact
         id: upload
         uses: actions/upload-artifact@v4
@@ -94,15 +78,7 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE
           git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
-          cd tdesign-flutter/tdesign-component
-          sed -i "s|url: https://github.com/TDesignOteam/tdesign-flutter-tools.git|path: $GITHUB_WORKSPACE|" pubspec.yaml
-          sed -i "s|ref: main|ref: $GITHUB_REF|" pubspec.yaml
-          flutter pub get
-          cd demo_tool
-          sed -i "s|dart run tdesign_flutter_tools:main|$GITHUB_WORKSPACE/api_tool_linux|g" all_build.sh
-          mkdir -p bin && cp $GITHUB_WORKSPACE/api_tool_linux bin/
-          chmod +x api_tool_linux bin/api_tool_linux
-          sh all_build.sh
+          dart run .github/scripts/cross_platform_verify.dart tdesign-flutter api_tool_linux
       - name: Upload Artifact
         id: upload
         uses: actions/upload-artifact@v4
@@ -126,19 +102,9 @@ jobs:
       - name: Build Windows x64
         run: dart compile exe bin/main.dart -o api_tool_windows
       - name: Verify with tdesign-flutter
-        shell: bash
         run: |
-          cd $GITHUB_WORKSPACE
           git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
-          cd tdesign-flutter/tdesign-component
-          sed -i "s|url: https://github.com/TDesignOteam/tdesign-flutter-tools.git|path: $GITHUB_WORKSPACE|" pubspec.yaml
-          sed -i "s|ref: main|ref: $GITHUB_REF|" pubspec.yaml
-          flutter pub get
-          cd demo_tool
-          sed -i "s|dart run tdesign_flutter_tools:main|$GITHUB_WORKSPACE/api_tool_windows|g" all_build.sh
-          mkdir -p bin
-          cp $GITHUB_WORKSPACE/api_tool_windows bin/
-          sh all_build.sh
+          dart run tools/cross_platform_verify.dart tdesign-flutter api_tool_windows
       - name: Upload Artifact
         id: upload
         uses: actions/upload-artifact@v4
@@ -169,4 +135,4 @@ jobs:
             - [api_tool_macos_arm64](${{ needs.build-macos-arm64.outputs.artifact_url }}) 
             - [api_tool_linux](${{ needs.build-linux-x64.outputs.artifact_url }})
             - [api_tool_windows](${{ needs.build-windows-x64.outputs.artifact_url }})
-          edit-mode: replace 
+          edit-mode: replace
