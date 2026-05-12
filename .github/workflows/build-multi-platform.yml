@@ -15,85 +15,34 @@ permissions:
 
 jobs:
   build-macos-intel:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: "3.32.0"
-          channel: stable
-          cache: true
-      - run: flutter pub get
-      - run: dart compile exe bin/main.dart -o api_tool_macos_intel
-      - name: Verify binary
-        run: |
-          git clone --depth 1 --branch main https://github.com/TDesignOteam/tdesign-flutter-v1.git tdesign-flutter-v1
-          dart run .github/scripts/cross_platform_verify.dart tdesign-flutter-v1 api_tool_macos_intel
-      - uses: actions/upload-artifact@v4
-        with:
-          name: api_tool_macos_intel
-          path: api_tool_macos_intel
+    uses: ./.github/workflows/build-reusable.yml
+    with:
+      runner: macos-latest
+      artifact-name: api_tool_macos_intel
+      binary-name: api_tool_macos_intel
 
   build-macos-arm64:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: "3.32.0"
-          channel: stable
-          cache: true
-      - run: flutter pub get
-      - run: dart compile exe bin/main.dart -o api_tool_macos_arm64 --target-os=macos --target-arch=arm64
-      - name: Verify binary
-        run: |
-          git clone --depth 1 --branch main https://github.com/TDesignOteam/tdesign-flutter-v1.git tdesign-flutter-v1
-          dart run .github/scripts/cross_platform_verify.dart tdesign-flutter-v1 api_tool_macos_arm64
-      - uses: actions/upload-artifact@v4
-        with:
-          name: api_tool_macos_arm64
-          path: api_tool_macos_arm64
+    uses: ./.github/workflows/build-reusable.yml
+    with:
+      runner: macos-latest
+      artifact-name: api_tool_macos_arm64
+      binary-name: api_tool_macos_arm64
+      compile-args: '--target-os=macos --target-arch=arm64'
 
   build-linux-x64:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: "3.32.0"
-          channel: stable
-          cache: true
-      - run: flutter pub get
-      - run: dart compile exe bin/main.dart -o api_tool_linux --target-arch=x64
-      - name: Verify binary
-        run: |
-          git clone --depth 1 --branch main https://github.com/TDesignOteam/tdesign-flutter-v1.git tdesign-flutter-v1
-          dart run .github/scripts/cross_platform_verify.dart tdesign-flutter-v1 api_tool_linux
-      - uses: actions/upload-artifact@v4
-        with:
-          name: api_tool_linux
-          path: api_tool_linux
+    uses: ./.github/workflows/build-reusable.yml
+    with:
+      runner: ubuntu-latest
+      artifact-name: api_tool_linux
+      binary-name: api_tool_linux
+      compile-args: '--target-arch=x64'
 
   build-windows-x64:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: "3.32.0"
-          channel: stable
-          cache: true
-      - run: flutter pub get
-      - run: dart compile exe bin/main.dart -o api_tool_windows.exe
-      - name: Verify binary
-        shell: bash
-        run: |
-          git clone --depth 1 --branch main https://github.com/TDesignOteam/tdesign-flutter-v1.git tdesign-flutter-v1
-          dart run .github/scripts/cross_platform_verify.dart tdesign-flutter-v1 api_tool_windows.exe
-      - uses: actions/upload-artifact@v4
-        with:
-          name: api_tool_windows
-          path: api_tool_windows.exe
+    uses: ./.github/workflows/build-reusable.yml
+    with:
+      runner: windows-latest
+      artifact-name: api_tool_windows
+      binary-name: api_tool_windows.exe
 
   comment-on-pr:
     name: 更新二进制产物 PR 评论
