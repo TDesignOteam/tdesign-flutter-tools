@@ -1,7 +1,7 @@
-# demo_tool
+# tdesign_flutter_tools
 
-[![Flutter Version](https://img.shields.io/badge/Flutter-%3E%3D3.32.0%20%3C4.0.0-blue.svg?logo=flutter)](https://flutter.dev/)
-[![Dart Version](https://img.shields.io/badge/Dart-%3E%3D3.0.0%20%3C4.0.0-blue.svg?logo=dart)](https://dart.dev/)
+[![Flutter Version](https://img.shields.io/badge/Flutter-%3E%3D3.18.0-blue.svg?logo=flutter)](https://flutter.dev/)
+[![Dart Version](https://img.shields.io/badge/Dart-%3E%3D3.7.0-blue.svg?logo=dart)](https://dart.dev/)
 
 [TDesign Flutter](https://github.com/Tencent/tdesign-flutter) 组件库文档生成工具
 
