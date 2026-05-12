@@ -301,18 +301,9 @@ class ComponentVisitor extends RecursiveElementVisitor<void> {
   ComponentInfo parseBaseInfo(ClassElement element) {
     ComponentInfo componentInfo = ComponentInfo();
     componentInfo.name = element.displayName;
-    List<String> comments = [];
     if (element.documentationComment != null) {
-      comments = element.documentationComment!.split('///');
-    }
-    for (final String item in comments) {
-      if (item.trim().isNotEmpty) {
-        // print('注解：$item');
-        if (componentInfo.introduction!.isNotEmpty) {
-          componentInfo.introduction = '${componentInfo.introduction}  \n';
-        }
-        componentInfo.introduction = '${componentInfo.introduction}${item.trim()}';
-      }
+      componentInfo.introduction = removeDocumentationComment(
+          element.documentationComment!);
     }
     // print('\n组件基本信息：');
     // print('$componentInfo');

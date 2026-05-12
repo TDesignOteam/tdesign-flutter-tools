@@ -244,16 +244,13 @@ class SmartCreator {
 ## API''';
     StringBuffer sb = StringBuffer(fileContent);
     for (final apiInfo in parsedComponentInfoList) {
-      if (parsedComponentInfoList.length > 0) {
-        sb.write('\n');
-        if (parsedComponentInfoList.indexOf(apiInfo) >= 1) {
-          sb.write('''```\n```\n\n''');
-        }
-        sb.write('### ${apiInfo.componentInfo!.name}');
-        if (commandInfo?.isGetComments ?? false) {
-          sb.write('\n#### 简介\n');
-          sb.write('${apiInfo.componentInfo!.introduction}');
-        }
+      if (parsedComponentInfoList.length > 1 && parsedComponentInfoList.indexOf(apiInfo) >= 1) {
+        sb.write('\n\n');
+      }
+      sb.write('### ${apiInfo.componentInfo!.name}');
+      if (commandInfo?.isGetComments ?? false) {
+        sb.write('\n#### 简介\n');
+        sb.write('${apiInfo.componentInfo!.introduction}');
       }
       if (apiInfo.propertyList.isNotEmpty) {
 
