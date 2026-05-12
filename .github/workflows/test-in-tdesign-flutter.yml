@@ -24,21 +24,7 @@ jobs:
       - name: Build binary
         run: dart compile exe bin/main.dart -o tdesign_flutter_tools
 
-      - name: Checkout tdesign-flutter
-        run: git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
-
-      - name: Copy binary
+      - name: Verify binary
         run: |
-          cp tdesign_flutter_tools tdesign-flutter/tdesign-component/
-          chmod +x tdesign-flutter/tdesign-component/tdesign_flutter_tools
-
-      - name: Test generate help
-        working-directory: tdesign-flutter/tdesign-component
-        run: ./tdesign_flutter_tools generate --help
-
-      - name: Test generate button
-        working-directory: tdesign-flutter/tdesign-component
-        run: ./tdesign_flutter_tools generate --file lib/src/components/button/t_button.dart --name TDButton --output /tmp/test-docs/ --only-api
-
-      - name: Verify output
-        run: ls -la /tmp/test-docs/
+          git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
+          dart run .github/scripts/cross_platform_verify.dart tdesign-flutter tdesign_flutter_tools
