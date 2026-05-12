@@ -1,0 +1,123 @@
+name: Release on Version Change
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'pubspec.yaml'
+
+permissions:
+  contents: write
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version_changed: ${{ steps.check.outputs.changed }}
+      new_version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      - name: Check version change
+        id: check
+        run: |
+          # 获取当前版本
+          CURRENT_VERSION=$(grep '^version:' pubspec.yaml | head -1 | awk '{print $2}')
+          echo "Current version: $CURRENT_VERSION"
+
+          # 获取上一次提交的版本
+          PREVIOUS_VERSION=$(git show HEAD~1:pubspec.yaml 2>/dev/null | grep '^version:' | head -1 | awk '{print $2}' || echo "")
+          echo "Previous version: $PREVIOUS_VERSION"
+
+          # 对比版本
+          if [ "$CURRENT_VERSION" != "$PREVIOUS_VERSION" ]; then
+            echo "Version changed: $PREVIOUS_VERSION -> $CURRENT_VERSION"
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          else
+            echo "Version not changed, skipping release."
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check tag exists
+        if: steps.check.outputs.changed == 'true'
+        id: tag-check
+        run: |
+          TAG="v${{ steps.check.outputs.version }}"
+          if git ls-remote --tags origin | grep -q "refs/tags/$TAG$"; then
+            echo "Tag $TAG already exists, skipping release."
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
+  create-tag:
+    needs: check-version
+    if: needs.check-version.outputs.version_changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Create and push tag
+        run: |
+          TAG="v${{ needs.check-version.outputs.new_version }}"
+          git tag "$TAG"
+          git push origin "$TAG"
+
+  build-macos-intel:
+    needs: create-tag
+    uses: ./.github/workflows/build-reusable.yml
+    with:
+      runner: macos-latest
+      artifact-name: api_tool_macos_intel
+      binary-name: api_tool_macos_intel
+
+  build-macos-arm64:
+    needs: create-tag
+    uses: ./.github/workflows/build-reusable.yml
+    with:
+      runner: macos-latest
+      artifact-name: api_tool_macos_arm64
+      binary-name: api_tool_macos_arm64
+      compile-args: '--target-os=macos --target-arch=arm64'
+
+  build-linux-x64:
+    needs: create-tag
+    uses: ./.github/workflows/build-reusable.yml
+    with:
+      runner: ubuntu-latest
+      artifact-name: api_tool_linux
+      binary-name: api_tool_linux
+      compile-args: '--target-arch=x64'
+
+  build-windows-x64:
+    needs: create-tag
+    uses: ./.github/workflows/build-reusable.yml
+    with:
+      runner: windows-latest
+      artifact-name: api_tool_windows
+      binary-name: api_tool_windows.exe
+
+  create-release:
+    needs: [check-version, create-tag, build-macos-intel, build-macos-arm64, build-linux-x64, build-windows-x64]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+
+      - name: Create GitHub Release
+        id: release
+        run: |
+          TAG="v${{ needs.check-version.outputs.new_version }}"
+
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --generate-notes \
+            ./release-assets/api_tool_macos_intel/api_tool_macos_intel \
+            ./release-assets/api_tool_macos_arm64/api_tool_macos_arm64 \
+            ./release-assets/api_tool_linux/api_tool_linux \
+            ./release-assets/api_tool_windows/api_tool_windows.exe
