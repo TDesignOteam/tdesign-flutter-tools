@@ -1,0 +1,50 @@
+name: Test in TDesign Flutter
+
+on:
+  pull_request:
+    branches: [main, rss1102/*]
+  push:
+    branches: [rss1102/*]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.32.0'
+
+      - name: Checkout tdesign-flutter-tools
+        uses: actions/checkout@v4
+        with:
+          repository: TDesignOteam/tdesign-flutter-tools
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install dependencies
+        run: dart pub get
+
+      - name: Build binary
+        run: dart compile exe bin/main.dart -o tdesign_flutter_tools
+
+      - name: Checkout tdesign-flutter
+        uses: actions/checkout@v4
+        with:
+          repository: TDesignOteam/tdesign-flutter
+          ref: develop
+          token: ${{ secrets.GITHUB_TOKEN }}
+          path: tdesign-flutter
+
+      - name: Copy binary
+        run: cp tdesign_flutter_tools tdesign-flutter/
+
+      - name: Test generate help
+        working-directory: tdesign-flutter/tdesign-component
+        run: ./tdesign_flutter_tools generate --help
+
+      - name: Test generate button
+        working-directory: tdesign-flutter/tdesign-component/lib/src/components/button
+        run: ./tdesign_flutter_tools generate --file t_button.dart --name TDButton --output /tmp/test-docs --only-api
+
+      - name: Verify output
+        run: ls -la /tmp/test-docs/
