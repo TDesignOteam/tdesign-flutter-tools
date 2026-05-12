@@ -1,54 +1,63 @@
 #!/usr/bin/env dart
-// cross_platform_verify.dart
-// 跨平台 CI 验证脚本：修改 pubspec.yaml 和 all_build.sh，然后执行 all_build.sh
-// 用法: dart run cross_platform_verify.dart <tdesign-flutter-repo-path> <api-tool-path>
-
+/// CI 验证脚本：验证编译后的二进制产物能正确执行 generate 命令
+/// 用法: dart run .github/scripts/cross_platform_verify.dart <tdesign-flutter-path> <binary-path>
 import 'dart:io';
 
 void main(List<String> args) async {
   if (args.length < 2) {
-    print('Usage: dart run cross_platform_verify.dart <tdesign-flutter-path> <api-tool-path>');
+    print('Usage: dart run cross_platform_verify.dart <tdesign-flutter-path> <binary-path>');
     exit(1);
   }
 
   final repoPath = args[0];
-  final apiToolPath = args[1];
+  final binaryPath = args[1];
+  final cwd = Directory.current.path;
+  final binaryAbsPath = File('$cwd/$binaryPath').absolute.path;
+  final componentDir = '$cwd/$repoPath/tdesign-component';
 
-  // 1. 修改 pubspec.yaml：把 git 依赖改为 path 依赖，删除 ref 行
-  final pubspecFile = File('$repoPath/tdesign-component/pubspec.yaml');
-  final content = pubspecFile.readAsStringSync();
+  print('Binary: $binaryAbsPath');
+  print('Repo:   $componentDir');
 
-  String newContent = content
-      .replaceFirst(
-        RegExp(r"url: https://github\.com/TDesignOteam/tdesign-flutter-tools\.git"),
-        'path: ${Directory.current.path}',
-      )
-      .split('\n')
-      .where((line) => !line.trim().startsWith('ref:'))
-      .join('\n');
+  // 验证二进制文件存在
+  if (!File(binaryAbsPath).existsSync()) {
+    print('ERROR: Binary not found: $binaryAbsPath');
+    exit(1);
+  }
 
-  pubspecFile.writeAsStringSync(newContent);
-  print('pubspec.yaml updated');
+  // 用一个真实的 dart 文件测试 generate 命令
+  final testFile = '$componentDir/lib/src/components/button/t_button.dart';
+  if (!File(testFile).existsSync()) {
+    print('ERROR: Test file not found: $testFile');
+    exit(1);
+  }
 
-  // 2. 修改 all_build.sh：把 dart run 改为直接调用二进制（加 ./ 前缀确保能找到）
-  final allBuildFile = File('$repoPath/tdesign-component/demo_tool/all_build.sh');
-  final scriptContent = allBuildFile.readAsStringSync();
-  final replaced = scriptContent.replaceAll(
-    'dart run tdesign_flutter_tools:main',
-    './$apiToolPath',
-  );
-  allBuildFile.writeAsStringSync(replaced);
-  print('all_build.sh updated');
+  final outputDir = '$componentDir/example/assets/api/';
+  Directory(outputDir).createSync(recursive: true);
 
-  // 3. 执行 all_build.sh
-  print('Running all_build.sh...');
-  final result = await Process.run(
-    'sh',
-    ['all_build.sh'],
-    workingDirectory: '$repoPath/tdesign-component/demo_tool',
-  );
+  print('\nRunning: $binaryAbsPath generate ...');
+  final result = await Process.run(binaryAbsPath, [
+    'generate',
+    '--file', testFile,
+    '--name', 'TButton',
+    '--folder-name', 'button',
+    '--output', outputDir,
+    '--only-api',
+  ]);
 
   stdout.write(result.stdout);
   stderr.write(result.stderr);
-  exit(result.exitCode);
+
+  if (result.exitCode != 0) {
+    print('\nERROR: Binary verification failed (exit code ${result.exitCode})');
+    exit(result.exitCode);
+  }
+
+  // 验证输出文件生成
+  final outputFile = File('${outputDir}button_api.md');
+  if (outputFile.existsSync()) {
+    print('\nSUCCESS: button_api.md generated (${outputFile.lengthSync()} bytes)');
+  } else {
+    print('\nERROR: Expected output file not found: ${outputFile.path}');
+    exit(1);
+  }
 }

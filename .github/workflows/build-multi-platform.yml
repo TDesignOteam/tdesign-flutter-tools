@@ -20,9 +20,8 @@ jobs:
         run: flutter pub get
       - name: Build macOS Intel
         run: dart compile exe bin/main.dart -o api_tool_macos_intel
-      - name: Verify with tdesign-flutter
+      - name: Verify binary
         run: |
-          cd $GITHUB_WORKSPACE
           git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
           dart run .github/scripts/cross_platform_verify.dart tdesign-flutter api_tool_macos_intel
       - name: Upload Artifact
@@ -47,11 +46,10 @@ jobs:
         run: flutter pub get
       - name: Build macOS ARM64
         run: dart compile exe bin/main.dart -o api_tool_macos_arm64 --target-os=macos --target-arch=arm64
-      - name: Verify with tdesign-flutter
+      - name: Verify binary
         run: |
-          cd $GITHUB_WORKSPACE
           git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
-          dart run tools/cross_platform_verify.dart tdesign-flutter api_tool_macos_arm64
+          dart run .github/scripts/cross_platform_verify.dart tdesign-flutter api_tool_macos_arm64
       - name: Upload Artifact
         id: upload
         uses: actions/upload-artifact@v4
@@ -74,9 +72,8 @@ jobs:
         run: flutter pub get
       - name: Build Linux x64
         run: dart compile exe bin/main.dart -o api_tool_linux --target-arch=x64
-      - name: Verify with tdesign-flutter
+      - name: Verify binary
         run: |
-          cd $GITHUB_WORKSPACE
           git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
           dart run .github/scripts/cross_platform_verify.dart tdesign-flutter api_tool_linux
       - name: Upload Artifact
@@ -100,17 +97,17 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
       - name: Build Windows x64
-        run: dart compile exe bin/main.dart -o api_tool_windows
-      - name: Verify with tdesign-flutter
+        run: dart compile exe bin/main.dart -o api_tool_windows.exe
+      - name: Verify binary
         run: |
           git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
-          dart run tools/cross_platform_verify.dart tdesign-flutter api_tool_windows
+          dart run .github/scripts/cross_platform_verify.dart tdesign-flutter api_tool_windows.exe
       - name: Upload Artifact
         id: upload
         uses: actions/upload-artifact@v4
         with:
           name: api_tool_windows
-          path: api_tool_windows
+          path: api_tool_windows.exe
 
   comment-on-pr:
     needs: [build-macos-intel, build-macos-arm64, build-linux-x64, build-windows-x64]
