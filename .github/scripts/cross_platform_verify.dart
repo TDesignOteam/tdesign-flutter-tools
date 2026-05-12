@@ -30,12 +30,12 @@ void main(List<String> args) async {
   pubspecFile.writeAsStringSync(newContent);
   print('pubspec.yaml updated');
 
-  // 2. 修改 all_build.sh：把 dart run 改为直接调用二进制
+  // 2. 修改 all_build.sh：把 dart run 改为直接调用二进制（加 ./ 前缀确保能找到）
   final allBuildFile = File('$repoPath/tdesign-component/demo_tool/all_build.sh');
   final scriptContent = allBuildFile.readAsStringSync();
   final replaced = scriptContent.replaceAll(
     'dart run tdesign_flutter_tools:main',
-    apiToolPath,
+    './$apiToolPath',
   );
   allBuildFile.writeAsStringSync(replaced);
   print('all_build.sh updated');
