@@ -28,3 +28,66 @@ jobs:
         run: |
           git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
           dart run .github/scripts/cross_platform_verify.dart tdesign-flutter tdesign_flutter_tools
+
+  deploy-site:
+    needs: test
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+      pull-requests: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.32.0'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Checkout tdesign-flutter-tools
+        uses: actions/checkout@v4
+
+      - name: Install tools dependencies
+        run: dart pub get
+
+      - name: Build binary
+        run: dart compile exe bin/main.dart -o tdesign_flutter_tools
+
+      - name: Checkout tdesign-flutter
+        run: git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
+
+      - name: Generate all API docs
+        run: dart run .github/scripts/cross_platform_verify.dart tdesign-flutter tdesign_flutter_tools
+
+      - name: Install site dependencies
+        working-directory: tdesign-flutter/tdesign-site
+        run: npm install --legacy-peer-deps
+
+      - name: Build site
+        working-directory: tdesign-flutter/tdesign-site
+        run: npm run site
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: tdesign-flutter/tdesign-site/_site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Comment on PR
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            📖 文档站点预览已部署：
+            ${{ steps.deployment.outputs.page_url }}
+          edit-mode: replace
