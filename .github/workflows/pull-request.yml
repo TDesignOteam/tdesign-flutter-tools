@@ -128,25 +128,14 @@ jobs:
 
       - name: Generate API docs
         run: |
-          # 编译并运行 dart CLI 工具
+          mkdir -p tdesign-flutter-web/assets/api/
           dart compile exe bin/main.dart -o api_tool
           ./api_tool generate \
             --file tdesign-flutter/tdesign-component/lib/src/components/button/t_button.dart \
             --name TButton \
             --folder-name button \
-            --output tdesign-flutter/tdesign-component/example/assets/api/ \
+            --output tdesign-flutter-web/assets/api/ \
             --only-api
-          mkdir -p tdesign-flutter-web/assets/api/
-          cp -r tdesign-flutter/tdesign-component/example/assets/api/* tdesign-flutter-web/assets/api/
-          
-          # Generate manifest.json for API docs index
-          cat > tdesign-flutter-web/assets/api/manifest.json << EOF
-          {
-            "docs": [
-              {"name": "Button 按钮", "path": "assets/api/button_api.md"}
-            ]
-          }
-          EOF
 
       - uses: actions/upload-artifact@v4
         with:
