@@ -128,8 +128,9 @@ jobs:
 
       - name: Generate API docs
         run: |
-          # 在工作区根目录执行 dart run (当前仓库就是 tdesign-flutter-tools)
-          dart run . generate \
+          # 编译并运行 dart CLI 工具
+          dart compile exe bin/main.dart -o api_tool
+          ./api_tool generate \
             --file tdesign-flutter/tdesign-component/lib/src/components/button/t_button.dart \
             --name TButton \
             --folder-name button \
