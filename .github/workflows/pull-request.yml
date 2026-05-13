@@ -127,6 +127,35 @@ jobs:
           cp -r tdesign-site/_site/assets ../tdesign-flutter-web/flutter/assets || true
           cp -r tdesign-component/example/build/web/* ../tdesign-flutter-web/flutter/example/ || true
 
+      - name: Generate API docs
+        run: |
+          cd $GITHUB_WORKSPACE/tdesign-flutter/tdesign-component
+          flutter run . generate \
+            --file lib/src/components/button/t_button.dart \
+            --name TButton \
+            --folder-name button \
+            --output example/assets/api/ \
+            --only-api
+          mkdir -p $GITHUB_WORKSPACE/tdesign-flutter-web/assets/api/
+          cp -r tdesign-component/example/assets/api/* $GITHUB_WORKSPACE/tdesign-flutter-web/assets/api/
+          
+          # Generate manifest.json for API docs index
+          cat > $GITHUB_WORKSPACE/tdesign-flutter-web/assets/api/manifest.json << EOF
+          {
+            "docs": [
+              {"name": "Button 按钮", "path": "assets/api/button_api.md"}
+            ]
+          }
+          EOF
+
+      - name: Deploy API docs index
+        run: |
+          mkdir -p $GITHUB_WORKSPACE/tdesign-flutter-web/flutter/api-docs
+          # Copy Vue component for API docs index (if available)
+          if [ -f tdesign-site/site/src/api-docs/index.vue ]; then
+            cp tdesign-site/site/src/api-docs/index.vue $GITHUB_WORKSPACE/tdesign-flutter-web/flutter/api-docs/
+          fi
+
       - uses: actions/upload-artifact@v4
         with:
           name: tdesign-flutter-web
