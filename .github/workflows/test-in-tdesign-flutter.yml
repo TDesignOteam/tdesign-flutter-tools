@@ -1,0 +1,134 @@
+name: PREVIEW_BUILD
+
+on:
+  pull_request:
+    branches: [develop, main]
+    types: [opened, synchronize, reopened]
+
+jobs:
+  tdesign-flutter-site:
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, '[ci skip]')"
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Configure Git to not use symlinks
+        run: git config --global core.symlinks false
+
+      - name: Checkout tdesign-flutter
+        run: git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Set Node version
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+          cache-dependency-path: "tdesign-flutter/tdesign-site/pnpm-lock.yaml"
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: "jetbrains"
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: "12"
+        env:
+          SKIP_JDK_VERSION_CHECK: true
+
+      - name: Set up Flutter
+        uses: TDesignOteam/workflows/actions/setup-flutter@main
+        with:
+          flutter-version: 3.32.0
+          channel: stable
+          cache: true
+          aop-registry: true
+          aop-project-path: ./tdesign-flutter/tdesign-component/example
+
+      - name: Extract version from pubspec.yaml and set env
+        id: version
+        run: |
+          VERSION=$(grep "version:" tdesign-flutter/tdesign-component/pubspec.yaml | sed 's/version: //g' | xargs)
+          echo "Version from pubspec.yaml: $VERSION"
+          MAJOR=$(echo $VERSION | cut -d. -f1)
+          MINOR=$(echo $VERSION | cut -d. -f2)
+          FIX=$(echo $VERSION | cut -d. -f3)
+          echo "major_version=$MAJOR" >> $GITHUB_OUTPUT
+          echo "minor_version=$MINOR" >> $GITHUB_OUTPUT
+          echo "fix_version=$FIX" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Update assets files
+        run: |
+          VERSION="${{ steps.version.outputs.major_version }}.${{ steps.version.outputs.minor_version }}.${{ steps.version.outputs.fix_version }}"
+          echo "$VERSION" > tdesign-flutter/tdesign-component/example/assets/version
+          echo "$(date +%s%3N)" > tdesign-flutter/tdesign-component/example/assets/publish_time
+
+      - name: Create build environment file
+        run: |
+          cat > build-env.txt << EOF
+          MAJOR_VERSION=${{ steps.version.outputs.major_version }}
+          MINOR_VERSION=${{ steps.version.outputs.minor_version }}
+          FIX_VERSION=${{ steps.version.outputs.fix_version }}
+          VERSION=${{ steps.version.outputs.version }}
+          BUILD_NUMBER=${{ github.run_number }}
+          DEVOPS_UUID=${{ github.run_id }}
+          GIT_VERSION=${{ github.sha }}
+          PR_NUMBER=${{ github.event.number }}
+          SHA=${{ github.sha }}
+          EOF
+
+      - name: Upload build environment
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-env
+          path: build-env.txt
+          retention-days: 5
+
+      - name: Generate web documentation from demo code
+        working-directory: tdesign-flutter/tdesign-component/example
+        run: |
+          flutter test test/widget_test.dart --reporter expanded || {
+            echo "⚠ Widget test completed with warnings (this is expected)"
+          }
+
+      - name: Build site
+        working-directory: tdesign-flutter/tdesign-site
+        run: |
+          pnpm install --frozen-lockfile
+          npm run site
+
+      - name: Build site Demo
+        working-directory: tdesign-flutter/tdesign-component/example
+        run: |
+          flutter build web -t ./lib/main.dart --base-href /flutter/example/ --source-maps
+          cd $GITHUB_WORKSPACE/tdesign-flutter
+          mkdir -p ../tdesign-flutter-web/flutter/example/
+          cp -r tdesign-site/_site/* ../tdesign-flutter-web/ || echo "tdesign-site/_site/ not found or empty"
+          rm -rf ../tdesign-flutter-web/assets || true
+          for f in "$GITHUB_WORKSPACE/tdesign-flutter-web/index.html"; do
+            if [ -f "$f" ]; then
+              echo "Rewriting $f"
+              if ! grep -q '<base href="/">' "$f"; then
+                sed -i 's|<meta http-equiv="X-UA-Compatible" content="ie=edge">|<meta http-equiv="X-UA-Compatible" content="ie=edge">\n  <base href="/">|' "$f" || true
+              fi
+              sed -i "s|src=\"/flutter/|src=\"flutter/|g; s|href=\"/flutter/|href=\"flutter/|g; s|src='/flutter/|src='flutter/|g; s|href='/flutter/|href='flutter/|g" "$f" || true
+            fi
+          done
+          cp -v tdesign-site/_site/index.html ../tdesign-flutter-web/404.html || true
+          cp -v tdesign-site/_site/index.html ../tdesign-flutter-web/200.html || true
+          cp -r tdesign-site/_site/assets ../tdesign-flutter-web/flutter/assets || true
+          cp -r tdesign-component/example/build/web/* ../tdesign-flutter-web/flutter/example/ || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tdesign-flutter-web
+          path: ${{ github.workspace }}/tdesign-flutter-web
+          retention-days: 5
