@@ -65,8 +65,7 @@ jobs:
         run: |
           # widget_test.dart 会遍历每个组件页面，生成 tdesign-site/src/<组件>/README.md
           # （内容已嵌入 example/assets/api/<组件>_api.md 的 API 表格）
-          flutter test test/widget_test.dart --reporter expanded || \
-            echo "⚠ Widget test completed with warnings (expected)"
+          flutter test test/widget_test.dart --reporter expanded
 
       - name: Build site
         working-directory: tdesign-flutter/tdesign-site
@@ -81,16 +80,17 @@ jobs:
       - name: Assemble preview artifact
         run: |
           mkdir -p tdesign-flutter-web/flutter/example
-          # 站点页面（含组件文档，编译产物根目录指向 surge 根）
+          # 站点页面（编译后的 _site 直接铺到 surge 根）
           cp -r tdesign-flutter/tdesign-site/_site/. tdesign-flutter-web/
-          # surge SPA 兜底
-          cp tdesign-flutter/tdesign-site/_site/index.html tdesign-flutter-web/404.html
+          # surge 通过 200.html / 404.html 实现 SPA fallback
           cp tdesign-flutter/tdesign-site/_site/index.html tdesign-flutter-web/200.html
-          # flutter web demo
+          cp tdesign-flutter/tdesign-site/_site/index.html tdesign-flutter-web/404.html
+          # flutter web demo（base-href: /flutter/example/）
           cp -r tdesign-flutter/tdesign-component/example/build/web/. tdesign-flutter-web/flutter/example/
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload preview artifact
+        uses: actions/upload-artifact@v4
         with:
           name: tdesign-flutter-web
-          path: ${{ github.workspace }}/tdesign-flutter-web
+          path: tdesign-flutter-web
           retention-days: 5

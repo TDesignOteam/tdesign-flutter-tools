@@ -6,6 +6,11 @@ on:
     types:
       - completed
 
+env:
+  FAILURE_BODY: |
+    [<img height="96" alt="失败" src="https://user-images.githubusercontent.com/5378891/75333447-1e63a280-58c1-11ea-975d-235367fd1522.png">](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+    <!-- AUTO_PREVIEW_HOOK -->
+
 jobs:
   preview-success-web:
     runs-on: ubuntu-latest
@@ -35,9 +40,7 @@ jobs:
       - name: Deploy to surge
         id: deploy
         run: |
-          repository=${{ github.repository }}
-          project_name=${repository#*/}
-          DEPLOY_DOMAIN=https://preview-pr-${{ steps.pr.outputs.number }}-$project_name.surge.sh
+          DEPLOY_DOMAIN=https://preview-pr-${{ steps.pr.outputs.number }}-${{ github.event.repository.name }}.surge.sh
           npx surge --project ./tdesign-flutter-web --domain $DEPLOY_DOMAIN --token ${{ secrets.TDESIGN_SURGE_TOKEN }}
           echo "url=$DEPLOY_DOMAIN" >> $GITHUB_OUTPUT
 
@@ -62,9 +65,7 @@ jobs:
         uses: actions-cool/maintain-one-comment@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          body: |
-            [<img height="96" alt="失败" src="https://user-images.githubusercontent.com/5378891/75333447-1e63a280-58c1-11ea-975d-235367fd1522.png">](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-            <!-- AUTO_PREVIEW_HOOK -->
+          body: ${{ env.FAILURE_BODY }}
           number: ${{ steps.pr.outputs.number }}
           body-include: "<!-- AUTO_PREVIEW_HOOK -->"
 
@@ -89,8 +90,6 @@ jobs:
         uses: actions-cool/maintain-one-comment@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          body: |
-            [<img height="96" alt="失败" src="https://user-images.githubusercontent.com/5378891/75333447-1e63a280-58c1-11ea-975d-235367fd1522.png">](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-            <!-- AUTO_PREVIEW_HOOK -->
+          body: ${{ env.FAILURE_BODY }}
           number: ${{ steps.pr.outputs.number }}
           body-include: "<!-- AUTO_PREVIEW_HOOK -->"
