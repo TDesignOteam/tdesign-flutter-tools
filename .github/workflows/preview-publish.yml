@@ -1,5 +1,3 @@
-# 文件名建议统一为 preview-publish
-# 应用 preview.yml 的 demo
 name: PREVIEW_PUBLISH
 
 on:
@@ -15,65 +13,59 @@ jobs:
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.conclusion == 'success'
     steps:
-      - name: download build artifacts
-        uses: dawidd6/action-download-artifact@v6
+      - name: Download PR number
+        uses: actions/download-artifact@v4
         with:
-          workflow: ${{ github.event.workflow_run.workflow_id }}
-          run_id: ${{ github.event.workflow_run.id }}
-          name: build-env
+          name: pr-number
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: load build env variables
-        id: build_env
-        run: |
-          # 从文件中读取环境变量并设置为输出
-          while IFS='=' read -r key value; do
-            echo "$key=$value" >> $GITHUB_OUTPUT
-            echo "Loaded: $key=$value"
-          done < build-env.txt
+      - name: Read PR number
+        id: pr
+        run: echo "number=$(cat pr-number.txt)" >> $GITHUB_OUTPUT
 
-      - name: download tdesign-flutter-web artifact
-        uses: dawidd6/action-download-artifact@v6
+      - name: Download web artifact
+        uses: actions/download-artifact@v4
         with:
-          workflow: ${{ github.event.workflow_run.workflow_id }}
-          run_id: ${{ github.event.workflow_run.id }}
           name: tdesign-flutter-web
           path: tdesign-flutter-web
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload surge service and generate preview URL
+      - name: Deploy to surge
         id: deploy
         run: |
-          repository=${{github.repository}}
+          repository=${{ github.repository }}
           project_name=${repository#*/}
-          export DEPLOY_DOMAIN=https://preview-pr-${{ steps.build_env.outputs.PR_NUMBER }}-$project_name.surge.sh
+          DEPLOY_DOMAIN=https://preview-pr-${{ steps.pr.outputs.number }}-$project_name.surge.sh
           npx surge --project ./tdesign-flutter-web --domain $DEPLOY_DOMAIN --token ${{ secrets.TDESIGN_SURGE_TOKEN }}
-          echo the preview URL is $DEPLOY_DOMAIN
           echo "url=$DEPLOY_DOMAIN" >> $GITHUB_OUTPUT
 
-      - name: update status comment
+      - name: Update PR comment
         uses: actions-cool/maintain-one-comment@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           body: |
-            <a href="${{steps.deploy.outputs.url}}"><img height="96" alt="完成" src="https://user-images.githubusercontent.com/15634204/150816437-9f5bb788-cd67-4cbc-9897-b82d74e9aa65.png" /></a>
+            <a href="${{ steps.deploy.outputs.url }}"><img height="96" alt="完成" src="https://user-images.githubusercontent.com/15634204/150816437-9f5bb788-cd67-4cbc-9897-b82d74e9aa65.png" /></a>
 
-            **预览地址**: [${{steps.deploy.outputs.url}}](${{steps.deploy.outputs.url}})
+            **预览地址**: [${{ steps.deploy.outputs.url }}](${{ steps.deploy.outputs.url }})
 
             **组件文档（示例）**:
-            - [Button 按钮](${{steps.deploy.outputs.url}}/flutter/components/button)
+            - [Button 按钮](${{ steps.deploy.outputs.url }}/flutter/components/button)
 
             <!-- AUTO_PREVIEW_HOOK -->
-          number: ${{ steps.build_env.outputs.PR_NUMBER }}
+          number: ${{ steps.pr.outputs.number }}
           body-include: "<!-- AUTO_PREVIEW_HOOK -->"
 
-      - name: The job failed
+      - name: Mark failure on PR
         if: ${{ failure() }}
         uses: actions-cool/maintain-one-comment@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           body: |
-            [<img height="96" alt="失败" src="https://user-images.githubusercontent.com/5378891/75333447-1e63a280-58c1-11ea-975d-235367fd1522.png">](${{github.server_url}}/${{github.repository}}/actions/runs/${{github.run_id}})
+            [<img height="96" alt="失败" src="https://user-images.githubusercontent.com/5378891/75333447-1e63a280-58c1-11ea-975d-235367fd1522.png">](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
             <!-- AUTO_PREVIEW_HOOK -->
-          number: ${{ steps.build_env.outputs.PR_NUMBER }}
+          number: ${{ steps.pr.outputs.number }}
           body-include: "<!-- AUTO_PREVIEW_HOOK -->"
 
   preview-failed:
@@ -82,28 +74,23 @@ jobs:
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.conclusion == 'failure'
     steps:
-      - name: download build artifacts
-        uses: dawidd6/action-download-artifact@v6
+      - name: Download PR number
+        uses: actions/download-artifact@v4
         with:
-          workflow: ${{ github.event.workflow_run.workflow_id }}
-          run_id: ${{ github.event.workflow_run.id }}
-          name: build-env
+          name: pr-number
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: load build env variables
-        id: build_env
-        run: |
-          # 从文件中读取环境变量并设置为输出
-          while IFS='=' read -r key value; do
-            echo "$key=$value" >> $GITHUB_OUTPUT
-            echo "Loaded: $key=$value"
-          done < build-env.txt
+      - name: Read PR number
+        id: pr
+        run: echo "number=$(cat pr-number.txt)" >> $GITHUB_OUTPUT
 
-      - name: The job failed
+      - name: Mark failure on PR
         uses: actions-cool/maintain-one-comment@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           body: |
-            [<img height="96" alt="失败" src="https://user-images.githubusercontent.com/5378891/75333447-1e63a280-58c1-11ea-975d-235367fd1522.png">](${{github.server_url}}/${{github.repository}}/actions/runs/${{github.run_id}})
+            [<img height="96" alt="失败" src="https://user-images.githubusercontent.com/5378891/75333447-1e63a280-58c1-11ea-975d-235367fd1522.png">](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
             <!-- AUTO_PREVIEW_HOOK -->
-          number: ${{ steps.build_env.outputs.PR_NUMBER }}
+          number: ${{ steps.pr.outputs.number }}
           body-include: "<!-- AUTO_PREVIEW_HOOK -->"

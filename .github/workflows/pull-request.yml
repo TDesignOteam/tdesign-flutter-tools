@@ -12,36 +12,22 @@ jobs:
       - name: Checkout tdesign-flutter
         run: git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
 
-      - name: Override tdesign_flutter_tools ref to current PR
+      - name: Override tdesign_flutter_tools to current PR
         working-directory: tdesign-flutter/tdesign-component
         env:
           PR_REPO: ${{ github.event.pull_request.head.repo.full_name }}
           PR_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          # 把 pubspec.yaml 中 tdesign_flutter_tools 的 git 引用临时替换为当前 PR 的 head
-          # 让 CI 真正测试到本次 PR 的改动（而不是 main 分支的旧版本）
-          echo "Override tdesign_flutter_tools -> https://github.com/${PR_REPO}.git @ ${PR_SHA}"
-          python3 - <<'PY'
-          import os, re, pathlib
-          p = pathlib.Path('pubspec.yaml')
-          text = p.read_text(encoding='utf-8')
-          repo = os.environ['PR_REPO']
-          sha = os.environ['PR_SHA']
-          pattern = re.compile(
-              r'(tdesign_flutter_tools:\s*\n\s*git:\s*\n)'
-              r'(\s*url:\s*).*\n'
-              r'(\s*ref:\s*).*',
-              re.MULTILINE,
-          )
-          new_text, n = pattern.subn(
-              rf'\1\2https://github.com/{repo}.git\n\3{sha}',
-              text,
-          )
-          if n != 1:
-              raise SystemExit(f'Expected exactly 1 match, got {n}')
-          p.write_text(new_text, encoding='utf-8')
-          PY
-          grep -A 4 "tdesign_flutter_tools:" pubspec.yaml
+          # 通过 pubspec_overrides.yaml 让 CI 真正测试到本次 PR 的改动
+          # 这是 Dart 原生支持的覆盖机制，flutter pub get 会自动识别
+          cat > pubspec_overrides.yaml <<EOF
+          dependency_overrides:
+            tdesign_flutter_tools:
+              git:
+                url: https://github.com/${PR_REPO}.git
+                ref: ${PR_SHA}
+          EOF
+          cat pubspec_overrides.yaml
 
       - name: Install pnpm
         uses: pnpm/action-setup@v2
@@ -65,13 +51,13 @@ jobs:
           aop-project-path: ./tdesign-flutter/tdesign-component/example
 
       - name: Save PR number for publish workflow
-        run: echo "PR_NUMBER=${{ github.event.number }}" > build-env.txt
+        run: echo "${{ github.event.number }}" > pr-number.txt
 
       - name: Upload PR number
         uses: actions/upload-artifact@v4
         with:
-          name: build-env
-          path: build-env.txt
+          name: pr-number
+          path: pr-number.txt
           retention-days: 5
 
       - name: Generate site README via flutter test
@@ -90,7 +76,7 @@ jobs:
 
       - name: Build flutter web demo
         working-directory: tdesign-flutter/tdesign-component/example
-        run: flutter build web -t ./lib/main.dart --base-href /flutter/example/ --source-maps
+        run: flutter build web -t ./lib/main.dart --base-href /flutter/example/
 
       - name: Assemble preview artifact
         run: |
