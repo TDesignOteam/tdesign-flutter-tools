@@ -141,21 +141,11 @@ class SmartCreator {
         if (result.exitCode == 0) {
           final dartExe = result.stdout.toString().trim();
           if (dartExe.isNotEmpty) {
-            // 解析符号链接，获取真实路径（fvm/asdf 等版本管理工具会用 symlink）
-            String realDartExe = dartExe;
-            try {
-              realDartExe = File(dartExe).resolveSymbolicLinksSync();
-            } catch (_) {
-              // 解析失败则使用原始路径
-            }
-            final binDir = dirname(realDartExe);
+            final binDir = dirname(dartExe);
             final parent = dirname(binDir);
-            // 优先检查 flutter 缓存的 dart-sdk（flutter 安装目录下）
-            final flutterCache = normalize(join(parent, 'bin', 'cache', 'dart-sdk'));
-            if (Directory(flutterCache).existsSync()) return flutterCache;
-            // 检查 dart-sdk 自身的 lib/_internal
             final internal = normalize(join(parent, 'lib', '_internal'));
             if (Directory(internal).existsSync()) return parent;
+            return parent;
           }
         }
       }

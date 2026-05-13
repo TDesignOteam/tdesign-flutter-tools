@@ -126,17 +126,6 @@ jobs:
           cp -r tdesign-site/_site/assets ../tdesign-flutter-web/flutter/assets || true
           cp -r tdesign-component/example/build/web/* ../tdesign-flutter-web/flutter/example/ || true
 
-      - name: Generate API docs
-        run: |
-          mkdir -p tdesign-flutter-web/assets/api/
-          dart compile exe bin/main.dart -o api_tool
-          ./api_tool generate \
-            --file tdesign-flutter/tdesign-component/lib/src/components/button/t_button.dart \
-            --name TButton \
-            --folder-name button \
-            --output tdesign-flutter-web/assets/api/ \
-            --only-api
-
       - uses: actions/upload-artifact@v4
         with:
           name: tdesign-flutter-web
