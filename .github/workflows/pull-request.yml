@@ -128,17 +128,18 @@ jobs:
 
       - name: Generate API docs
         run: |
+          # 在工作区根目录执行 dart run (当前仓库就是 tdesign-flutter-tools)
           dart run . generate \
             --file tdesign-flutter/tdesign-component/lib/src/components/button/t_button.dart \
             --name TButton \
             --folder-name button \
             --output tdesign-flutter/tdesign-component/example/assets/api/ \
             --only-api
-          mkdir -p $GITHUB_WORKSPACE/tdesign-flutter-web/assets/api/
-          cp -r tdesign-flutter/tdesign-component/example/assets/api/* $GITHUB_WORKSPACE/tdesign-flutter-web/assets/api/
+          mkdir -p tdesign-flutter-web/assets/api/
+          cp -r tdesign-flutter/tdesign-component/example/assets/api/* tdesign-flutter-web/assets/api/
           
           # Generate manifest.json for API docs index
-          cat > $GITHUB_WORKSPACE/tdesign-flutter-web/assets/api/manifest.json << EOF
+          cat > tdesign-flutter-web/assets/api/manifest.json << EOF
           {
             "docs": [
               {"name": "Button 按钮", "path": "assets/api/button_api.md"}
