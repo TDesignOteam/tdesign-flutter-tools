@@ -109,7 +109,6 @@ jobs:
         working-directory: tdesign-flutter/tdesign-component/example
         run: |
           flutter build web -t ./lib/main.dart --base-href /flutter/example/ --source-maps
-          cd $GITHUB_WORKSPACE/tdesign-flutter
           mkdir -p ../tdesign-flutter-web/flutter/example/
           cp -r tdesign-site/_site/* ../tdesign-flutter-web/ || echo "tdesign-site/_site/ not found or empty"
           rm -rf ../tdesign-flutter-web/assets || true
@@ -117,7 +116,7 @@ jobs:
             if [ -f "$f" ]; then
               echo "Rewriting $f"
               if ! grep -q '<base href="/">' "$f"; then
-                sed -i 's|<meta http-equiv="X-UA-Compatible" content="ie=edge">|<meta http-equiv="X-UA-Compatible" content="ie=edge">\n  <base href="/">|' "$f" || true
+                sed -i 's|<meta http-equiv="X-UA-Compatible" content="ie=edge">|<meta http-equiv="X-UA-Compatible" content="ie=edge">\n  <base href=\">|' "$f" || true
               fi
               sed -i "s|src=\"/flutter/|src=\"flutter/|g; s|href=\"/flutter/|href=\"flutter/|g; s|src='/flutter/|src='flutter/|g; s|href='/flutter/|href='flutter/|g" "$f" || true
             fi
@@ -129,15 +128,14 @@ jobs:
 
       - name: Generate API docs
         run: |
-          cd $GITHUB_WORKSPACE/tdesign-flutter
           dart run . generate \
-            --file tdesign-component/lib/src/components/button/t_button.dart \
+            --file tdesign-flutter/tdesign-component/lib/src/components/button/t_button.dart \
             --name TButton \
             --folder-name button \
-            --output tdesign-component/example/assets/api/ \
+            --output tdesign-flutter/tdesign-component/example/assets/api/ \
             --only-api
           mkdir -p $GITHUB_WORKSPACE/tdesign-flutter-web/assets/api/
-          cp -r tdesign-component/example/assets/api/* $GITHUB_WORKSPACE/tdesign-flutter-web/assets/api/
+          cp -r tdesign-flutter/tdesign-component/example/assets/api/* $GITHUB_WORKSPACE/tdesign-flutter-web/assets/api/
           
           # Generate manifest.json for API docs index
           cat > $GITHUB_WORKSPACE/tdesign-flutter-web/assets/api/manifest.json << EOF
