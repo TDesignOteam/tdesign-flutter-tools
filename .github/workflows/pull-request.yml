@@ -1,25 +1,45 @@
-name: PREVIEW_BUILD
+name: PR 文档预览构建
 
 on:
   pull_request:
     branches: [develop, main]
     types: [opened, synchronize, reopened]
 
+env:
+  PREVIEW_URL: https://preview-pr-${{ github.event.number }}-${{ github.event.repository.name }}.surge.sh
+
 jobs:
-  tdesign-flutter-site:
+  构建文档与预览站:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
-      - name: Checkout tdesign-flutter
+      - name: 检出 tdesign-flutter-tools（本 PR）
+        uses: actions/checkout@v4
+
+      - name: 保存 PR 编号（供失败时通知）
+        run: echo "${{ github.event.number }}" > pr-number.txt
+
+      - name: 上传 PR 编号
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-number
+          path: pr-number.txt
+          retention-days: 5
+
+      - name: 克隆 tdesign-flutter（develop）
         run: git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
 
-      - name: Override tdesign_flutter_tools to current PR
+      - name: 快照 develop 已提交文档（diff 基准）
+        run: |
+          cp -r tdesign-flutter/tdesign-component/example/assets/api /tmp/api-baseline
+          cp -r tdesign-flutter/tdesign-site/src /tmp/site-src-baseline
+
+      - name: 覆盖依赖为本 PR 的 tdesign_flutter_tools
         working-directory: tdesign-flutter/tdesign-component
         env:
           PR_REPO: ${{ github.event.pull_request.head.repo.full_name }}
           PR_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          # 通过 pubspec_overrides.yaml 让 CI 真正测试到本次 PR 的改动
-          # 这是 Dart 原生支持的覆盖机制，flutter pub get 会自动识别
           cat > pubspec_overrides.yaml <<EOF
           dependency_overrides:
             tdesign_flutter_tools:
@@ -27,21 +47,20 @@ jobs:
                 url: https://github.com/${PR_REPO}.git
                 ref: ${PR_SHA}
           EOF
-          cat pubspec_overrides.yaml
 
-      - name: Install pnpm
+      - name: 安装 pnpm
         uses: pnpm/action-setup@v2
         with:
           version: 9
 
-      - name: Set Node version
+      - name: 安装 Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "pnpm"
           cache-dependency-path: "tdesign-flutter/tdesign-site/pnpm-lock.yaml"
 
-      - name: Set up Flutter
+      - name: 安装 Flutter 3.32
         uses: TDesignOteam/workflows/actions/setup-flutter@main
         with:
           flutter-version: 3.32.0
@@ -50,45 +69,56 @@ jobs:
           aop-registry: true
           aop-project-path: ./tdesign-flutter/tdesign-component/example
 
-      - name: Save PR number for publish workflow
-        run: echo "${{ github.event.number }}" > pr-number.txt
+      - name: Flutter 依赖解析（tdesign-component）
+        working-directory: tdesign-flutter/tdesign-component
+        run: flutter pub get
 
-      - name: Upload PR number
+      - name: 用本 PR tools 全量重生成 API 文档
+        working-directory: tdesign-flutter/tdesign-component
+        run: |
+          dart compile exe ${{ github.workspace }}/bin/main.dart -o /tmp/api_tool
+          /tmp/api_tool update
+
+      - name: 运行 widget_test 生成站点 README
+        working-directory: tdesign-flutter/tdesign-component/example
+        run: flutter test test/widget_test.dart --reporter expanded
+
+      - name: 生成文档 diff 评论内容
+        run: |
+          dart run .github/scripts/build_doc_diff_comment.dart \
+            --out doc-diff-comment.md \
+            --preview-url "${{ env.PREVIEW_URL }}" \
+            --compare /tmp/api-baseline tdesign-flutter/tdesign-component/example/assets/api "API 文档 (assets/api)" "*_api.md" \
+            --compare /tmp/site-src-baseline tdesign-flutter/tdesign-site/src "站点文档 (tdesign-site/src)" "README.md"
+
+      - name: 上传文档 diff 与 PR 元数据
         uses: actions/upload-artifact@v4
         with:
-          name: pr-number
-          path: pr-number.txt
+          name: preview-metadata
+          path: |
+            pr-number.txt
+            doc-diff-comment.md
           retention-days: 5
 
-      - name: Generate site README via flutter test
-        working-directory: tdesign-flutter/tdesign-component/example
-        run: |
-          # widget_test.dart 会遍历每个组件页面，生成 tdesign-site/src/<组件>/README.md
-          # （内容已嵌入 example/assets/api/<组件>_api.md 的 API 表格）
-          flutter test test/widget_test.dart --reporter expanded
-
-      - name: Build site
+      - name: 构建 tdesign-site 静态站
         working-directory: tdesign-flutter/tdesign-site
         run: |
           pnpm install --frozen-lockfile
           npm run site
 
-      - name: Build flutter web demo
+      - name: 构建 Flutter Web 示例
         working-directory: tdesign-flutter/tdesign-component/example
         run: flutter build web -t ./lib/main.dart --base-href /flutter/example/
 
-      - name: Assemble preview artifact
+      - name: 组装 Surge 预览目录
         run: |
           mkdir -p tdesign-flutter-web/flutter/example
-          # 站点页面（编译后的 _site 直接铺到 surge 根）
           cp -r tdesign-flutter/tdesign-site/_site/. tdesign-flutter-web/
-          # surge 通过 200.html / 404.html 实现 SPA fallback
           cp tdesign-flutter/tdesign-site/_site/index.html tdesign-flutter-web/200.html
           cp tdesign-flutter/tdesign-site/_site/index.html tdesign-flutter-web/404.html
-          # flutter web demo（base-href: /flutter/example/）
           cp -r tdesign-flutter/tdesign-component/example/build/web/. tdesign-flutter-web/flutter/example/
 
-      - name: Upload preview artifact
+      - name: 上传 Surge 预览站产物
         uses: actions/upload-artifact@v4
         with:
           name: tdesign-flutter-web

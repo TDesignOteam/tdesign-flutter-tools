@@ -1,8 +1,8 @@
-name: PREVIEW_PUBLISH
+name: PR 预览发布
 
 on:
   workflow_run:
-    workflows: ["PREVIEW_BUILD"]
+    workflows: ["PR 文档预览构建"]
     types:
       - completed
 
@@ -12,24 +12,32 @@ env:
     <!-- AUTO_PREVIEW_HOOK -->
 
 jobs:
-  preview-success-web:
+  部署预览并评论:
     runs-on: ubuntu-latest
     if: >
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.conclusion == 'success'
     steps:
-      - name: Download PR number
+      - name: 下载 PR 编号
         uses: actions/download-artifact@v4
         with:
           name: pr-number
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Read PR number
+      - name: 下载文档 diff 评论
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: preview-metadata
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 解析 PR 编号
         id: pr
         run: echo "number=$(cat pr-number.txt)" >> $GITHUB_OUTPUT
 
-      - name: Download web artifact
+      - name: 下载 Surge 预览站产物
         uses: actions/download-artifact@v4
         with:
           name: tdesign-flutter-web
@@ -37,30 +45,39 @@ jobs:
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Deploy to surge
+      - name: 部署到 Surge
         id: deploy
         run: |
           DEPLOY_DOMAIN=https://preview-pr-${{ steps.pr.outputs.number }}-${{ github.event.repository.name }}.surge.sh
           npx surge --project ./tdesign-flutter-web --domain $DEPLOY_DOMAIN --token ${{ secrets.TDESIGN_SURGE_TOKEN }}
           echo "url=$DEPLOY_DOMAIN" >> $GITHUB_OUTPUT
 
-      - name: Update PR comment
+      - name: 组装 PR 评论正文
+        env:
+          PREVIEW_URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          printf '%s\n' \
+            "<a href=\"${PREVIEW_URL}\"><img height=\"96\" alt=\"完成\" src=\"https://user-images.githubusercontent.com/15634204/150816437-9f5bb788-cd67-4cbc-9897-b82d74e9aa65.png\" /></a>" \
+            '' \
+            "**预览地址**: [${{ PREVIEW_URL}](${PREVIEW_URL})" \
+            '' > pr-comment.md
+          if [ -f doc-diff-comment.md ]; then
+            echo "---" >> pr-comment.md
+            echo "" >> pr-comment.md
+            cat doc-diff-comment.md >> pr-comment.md
+          fi
+          echo "" >> pr-comment.md
+          echo "<!-- AUTO_PREVIEW_HOOK -->" >> pr-comment.md
+
+      - name: 更新 PR 预览评论
         uses: actions-cool/maintain-one-comment@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          body: |
-            <a href="${{ steps.deploy.outputs.url }}"><img height="96" alt="完成" src="https://user-images.githubusercontent.com/15634204/150816437-9f5bb788-cd67-4cbc-9897-b82d74e9aa65.png" /></a>
-
-            **预览地址**: [${{ steps.deploy.outputs.url }}](${{ steps.deploy.outputs.url }})
-
-            **组件文档（示例）**:
-            - [Button 按钮](${{ steps.deploy.outputs.url }}/flutter/components/button)
-
-            <!-- AUTO_PREVIEW_HOOK -->
+          body-path: pr-comment.md
           number: ${{ steps.pr.outputs.number }}
           body-include: "<!-- AUTO_PREVIEW_HOOK -->"
 
-      - name: Mark failure on PR
+      - name: 部署失败时标记 PR 评论
         if: ${{ failure() }}
         uses: actions-cool/maintain-one-comment@v3
         with:
@@ -69,24 +86,24 @@ jobs:
           number: ${{ steps.pr.outputs.number }}
           body-include: "<!-- AUTO_PREVIEW_HOOK -->"
 
-  preview-failed:
+  构建失败通知:
     runs-on: ubuntu-latest
     if: >
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.conclusion == 'failure'
     steps:
-      - name: Download PR number
+      - name: 下载 PR 编号
         uses: actions/download-artifact@v4
         with:
           name: pr-number
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Read PR number
+      - name: 解析 PR 编号
         id: pr
         run: echo "number=$(cat pr-number.txt)" >> $GITHUB_OUTPUT
 
-      - name: Mark failure on PR
+      - name: 更新 PR 失败评论
         uses: actions-cool/maintain-one-comment@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
