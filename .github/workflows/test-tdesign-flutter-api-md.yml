@@ -1,0 +1,38 @@
+name: test-tdesign-flutter-api-md
+on:
+  pull_request:
+    branches:
+      - main
+jobs:
+  test-tdesign-flutter-api-md:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout tdesign-flutter
+        uses: actions/checkout@v6
+        with:
+          repository: Tencent/tdesign-flutter
+
+      - name: Setup Flutter
+        uses: TDesignOteam/workflows/actions/setup-flutter@main
+        with:
+          flutter-version: 3.32.0
+          cache: true
+
+      - name: Modify tdesign_flutter_tools dependency
+        run: |
+          # 修改 url (匹配包含 tdesign_flutter_tools 后面紧跟的 url 行)
+          sed -i '/tdesign_flutter_tools:/,/url:/ {s|url:.*|url: https://github.com/${{ github.repository }}.git|}' tdesign-component/pubspec.yaml
+
+          # 修改 ref (匹配包含 tdesign_flutter_tools 后面紧跟的 ref 行)
+          sed -i '/tdesign_flutter_tools:/,/ref:/ {s|ref:.*|ref: ${{ github.head_ref }}|}' tdesign-component/pubspec.yaml
+
+
+      - name: tdesign-adaptation
+        run: sh ./tdesign-component/init.sh
+
+      - name: generate api md
+        working-directory: ./tdesign-component
+        run: sh ./demo_tool/all_build.sh
+
+      - name: Show api diff
+        run: git diff tdesign-component/example/assets/api
