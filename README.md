@@ -21,11 +21,48 @@
 /// 属性简介（必须）
 ```
 
+### 工具职责边界
+
+工具只负责**通用 AST 解析规则**，不会对个别组件做特殊兼容，也不会修正源码里不合规的注释。
+
+| 由工具负责（通用规则） | 由源码注释负责（需合规编写） |
+| --- | --- |
+| 从构造参数 AST 提取类型、默认值 | 字段/参数的 `///` 说明文案 |
+| 合并类字段到 API 表（含未入构造函数的 public 字段） | 注释内容与字段语义一致（如 content 不应写「标题」） |
+| 过滤 `this.xxx` 被误识别为默认值 | 错别字、遗漏注释、注释写在错误位置 |
+| 解析 `abstract class` 实例方法、工厂构造 | `super.key` 等场景的类型展示（后续可按 AST 规则增强） |
+| Markdown 表格转义、方法参数格式化 | 无注释时说明列显示 `-`（符合预期） |
+
+**原则：** 注释不合规导致的文档问题，应在组件源码中补全/修正 `///` 注释，而不是在工具里打补丁。
+
 ### 组件demo注释示例
 
 ```dart
 /// demo名称（可以为空，为空的时候默认显示组件名称）
 /// demo示例介绍（可以为空）
+```
+
+## 本地开发与测试
+
+当 `tdesign-component/pubspec.yaml` 使用 path 依赖指向本仓库时，可在本地直接验证文档生成，无需发布到 git：
+
+```bash
+# 1. 确保 component 的 pubspec 已配置：
+#    tdesign_flutter_tools:
+#      path: ../tdesign-flutter-tools
+
+# 2. 在 component 目录解析依赖（需要网络）
+cd ../tdesign-component && dart pub get
+
+# 3. 运行本地测试脚本（picker / calendar / dialog）
+./scripts/local_test.sh picker
+```
+
+若 `dart pub get` 因网络不可用失败，可临时将 `tdesign-component/.dart_tool/package_config.json` 中
+`tdesign_flutter_tools` 的 `rootUri` 指向本地路径，脚本会通过 `--packages` 跳过联网校验：
+
+```bash
+./scripts/local_test.sh calendar
 ```
 
 ## 组件库工具使用方法

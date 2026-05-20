@@ -81,118 +81,119 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
   ComponentInfo? componentInfo;
   List<PropertyInfo> propertyList = [];
   Map<String,PropertyInfo> fieldMap = {};
+  // 当前正在解析的目标类名（null 表示不在目标类内）
+  String? _currentTargetClassName;
+  // 当前正在解析的类是否是 abstract class（用于收集实例方法）
+  bool _currentClassIsAbstract = false;
+
+  bool get _isInTargetClass => _currentTargetClassName != null;
+
+  void _resetClassState() {
+    componentInfo = null;
+    propertyList = [];
+    fieldMap = {};
+    _currentTargetClassName = null;
+    _currentClassIsAbstract = false;
+  }
+
+  PropertyInfo _buildPropertyFromParameter(FormalParameter param) {
+    final PropertyInfo item = PropertyInfo();
+    item.name = param.name?.lexeme.toString() ?? '';
+    item.isRequired =
+        param.isRequired || param.toSource().toString().startsWith('@required');
+    item.isNamed = param.isNamed;
+    item.type = extractFormalParameterType(param);
+    item.defaultValue = formatDefaultValueForDoc(
+      extractFormalParameterDefaultValue(param),
+      paramName: item.name,
+      isRequired: item.isRequired,
+    );
+    return item;
+  }
+
+  void _mergeExtraFieldsIntoPropertyList() {
+    for (final MapEntry<String, PropertyInfo> entry in fieldMap.entries) {
+      if (entry.key.startsWith('_')) {
+        continue;
+      }
+      final bool exists =
+          propertyList.any((PropertyInfo element) => element.name == entry.key);
+      if (!exists) {
+        final PropertyInfo field = entry.value;
+        field.name = entry.key;
+        propertyList.add(field);
+      }
+    }
+  }
+
+  void _fillPropertyFromFieldMap(PropertyInfo item) {
+    final PropertyInfo? field = fieldMap[item.name];
+    if (field == null) {
+      return;
+    }
+    if (item.type.isEmpty && field.type.isNotEmpty) {
+      item.type = field.type;
+    }
+    if (item.introduction.isEmpty && field.introduction.isNotEmpty) {
+      item.introduction = field.introduction;
+    }
+  }
 
   @override
   void visitConstructorDeclaration(ConstructorDeclaration node) {
+    if (!_isInTargetClass) {
+      node.visitChildren(this);
+      return;
+    }
     node.visitChildren(this);
-    // 无命名构造函数
-    // List childEntities = node.childEntities.toList();
-    // bool isNormalConstructor = childEntities.isNotEmpty && nameList!.contains(childEntities[0].toString());
-    // bool isConstConstructor = childEntities.length >= 2 && childEntities[0].toString() == 'const' && nameList!.contains(childEntities[1].toString());
     if (node.name == null) {
       for (final FormalParameter param in node.parameters.parameters) {
-        List<String> strList = [];
-        strList.add('identifier:' + (param.name?.lexeme.toString() ?? ""));
-        strList.add('isNamed:' + param.isNamed.toString());
-        strList.add('isOptional:' + param.isOptional.toString());
-        strList.add('isOptionalNamed:' + param.isOptionalNamed.toString());
-        strList.add('isOptionalPositional:' + param.isOptionalPositional.toString());
-        strList.add('isPositional:' + param.isPositional.toString());
-        strList.add('isRequired:' + param.isRequired.toString());
-        strList.add('isRequiredNamed:' + param.isRequiredNamed.toString());
-        strList.add('isRequiredPositional:' + param.isRequiredPositional.toString());
-        strList.add('requiredKeyword:' + param.requiredKeyword.toString());
-        strList.add('declaredElement:' + param.declaredElement.toString());
-        strList.add('parent:' + param.toSource().toString());
-        strList.add('beginToken:' + param.beginToken.toString());
-        strList.add('endToken:' + param.endToken.toString());
-        String tmp = '';
-        if (param.childEntities.isNotEmpty) {
-          tmp = param.childEntities.map((e) => e.toString()).toList().join('|');
-        }
-        strList.add('childEntities:' + tmp);
-        Debug.yellow('构造参数[$folderName]: ${strList.join(', ')}');
-        PropertyInfo item = PropertyInfo();
-        item.name = param.name?.lexeme.toString() ?? "";
-        item.isRequired = param.isRequired || param.toSource().toString().startsWith('@required');
-        item.isNamed = param.isNamed;
-        if (param.childEntities.length == 3) {
-          item.defaultValue = param.childEntities.toList().last.toString();
-        }
-        if (tmp.startsWith('Key') && param.beginToken.toString() == 'Key') {
-          item.type = 'Key';
-        }
-        propertyList.add(item);
+        Debug.yellow('构造参数[$folderName]: ${param.toSource()}');
+        propertyList.add(_buildPropertyFromParameter(param));
       }
     } else {
       // 记录工厂构造方法
-      StaticMethodInfo staticMethodInfo = new StaticMethodInfo();
+      final StaticMethodInfo staticMethodInfo = StaticMethodInfo();
       staticMethodInfo.name = node.name.toString();
-      staticMethodInfo.introduction = removeDocumentationComment(node.documentationComment?.tokens.join("\n") ?? "");
-      // staticMethodInfo.returnType = node.returnType.type.toString();
-      node.parameters.parameters.forEach((element) {
-        PropertyInfo info = PropertyInfo();
-        info.name = element.name?.lexeme.toString() ?? "Null";
-        // if (element is SimpleFormalParameter) {
-        //   info.type = element.type.toString();
-        // } else if(element is DefaultFormalParameter && element.parameter is FieldFormalParameter){
-        //   info.type = (element.parameter as FieldFormalParameter).parameters.toString();
-        // } else if(element is FieldFormalParameter) {
-        //   info.name = element.toString();
-        // }
-
-        info.isRequired =
-            element.isRequiredNamed || element.isRequiredPositional;
-        info.isNamed = element.isNamed;
-
-        staticMethodInfo.params.add(info);
-      });
+      staticMethodInfo.introduction = removeDocumentationComment(
+          node.documentationComment?.tokens.join('\n') ?? '');
+      for (final FormalParameter element in node.parameters.parameters) {
+        staticMethodInfo.params.add(_buildPropertyFromParameter(element));
+      }
       componentInfo ??= ComponentInfo();
       componentInfo!.constructorMethodList.add(staticMethodInfo);
     }
-    String tmp = '';
-    if (node.childEntities.isNotEmpty) {
-      tmp = node.childEntities.map((e) => e.toString()).toList().join('|');
-    }
-    List<String> strList = [];
-    strList.add(node.firstTokenAfterCommentAndMetadata.toString());
-    strList.add(node.parameters.parameters.map((e) => e.name?.lexeme.toString() ?? "").toList().join('|'));
-    strList.add(node.childEntities.length.toString());
-    strList.add(tmp);
-    strList.add(node.beginToken.toString());
-    strList.add(node.name.toString());
-    // strList.add(node.toSource());
-    Debug.green('构造函数[$folderName]: ${strList.join(', ')}');
+    Debug.green(
+        '构造函数[$folderName]: ${node.name ?? 'default'} | ${node.parameters.parameters.map((FormalParameter e) => e.name?.lexeme).join('|')}');
   }
 
   @override
   void visitFieldDeclaration(FieldDeclaration node) {
+    if (!_isInTargetClass) {
+      node.visitChildren(this);
+      return;
+    }
     node.visitChildren(this);
-    String tmp = '';
-    if (node.childEntities.isNotEmpty) {
-      tmp = node.childEntities.map((e) => e.toString()).toList().join('|');
-    }
-    List<String> strList = [];
-    strList.add(node.childEntities.length.toString());
-    strList.add(tmp);
-    strList.add(node.beginToken.toString());
-    strList.add(node.toSource());
-    strList.add('type:' + node.fields.type.toString());
-    strList.add('fields:' + node.fields.variables.join(',').toString());
-    Debug.blue('成员变量[$folderName]: ${strList.join(', ')}');
     String fieldName = node.fields.variables.join(',');
-    if(fieldName.contains("=")){
-      fieldName = fieldName.split("=")[0].trim();
+    if (fieldName.contains('=')) {
+      fieldName = fieldName.split('=')[0].trim();
     }
-    PropertyInfo? item = propertyList.firstWhereOrNull((element) => element.name == fieldName);
-    if (item == null) {
-      item = PropertyInfo();
-      fieldMap[fieldName] = item;
+    if (fieldName.startsWith('_')) {
+      return;
     }
+    PropertyInfo? item =
+        propertyList.firstWhereOrNull((PropertyInfo element) => element.name == fieldName);
+    item ??= PropertyInfo()..name = fieldName;
+    fieldMap[fieldName] = item;
     item.type = node.fields.type.toString();
-    if (node.beginToken.toString().startsWith('///')) {
+    if (node.documentationComment != null) {
+      item.introduction = removeDocumentationComment(
+        node.documentationComment!.tokens.join('\n'),
+      );
+    } else if (node.beginToken.toString().startsWith('///')) {
       item.introduction = removeDocumentationComment(node.beginToken.toString());
     }
+    Debug.blue('成员变量[$folderName]: $fieldName | ${item.type}');
   }
 
   @override
@@ -214,61 +215,70 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitClassDeclaration(ClassDeclaration node) {
+    final bool isTarget = nameList!.contains(node.name.toString());
+    final String? previousTargetClassName = _currentTargetClassName;
+    final bool previousClassIsAbstract = _currentClassIsAbstract;
+    if (isTarget) {
+      _currentTargetClassName = node.name.toString();
+      _currentClassIsAbstract = node.abstractKeyword != null;
+    }
     node.visitChildren(this);
-    if (nameList!.contains(node.name.toString())) {
+    if (isTarget) {
       componentInfo ??= ComponentInfo();
-      List<String> strList = [];
-      strList.add(node.name.toString());
-      strList.add(node.beginToken.toString());
-      if (node.name.toString() == 'TECheckBox') {
-        // strList.add(node.getField('checked')!.parent!.parent!.beginToken.toString());
-        strList.add(node.getProperty('checked')!.parent!.parent!.beginToken.toString());
-      }
-      Debug.red('类[$folderName]: ${strList.join(', ')}');
       componentInfo!.name = node.name.toString();
       if (node.documentationComment != null) {
         componentInfo!.introduction = removeDocumentationComment(
-            node.documentationComment!.tokens.join("\n"));
+            node.documentationComment!.tokens.join('\n'));
       }
+      _mergeExtraFieldsIntoPropertyList();
+      for (final PropertyInfo item in propertyList) {
+        _fillPropertyFromFieldMap(item);
+        if (item.type.isEmpty) {
+          item.type = '-';
+        }
+      }
+      propertyList.sort(
+          (PropertyInfo a, PropertyInfo b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
       if (onParsedComponentInfoInfo != null) {
-        // 按照属性名称的首字母排序
-        propertyList.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-        
         onParsedComponentInfoInfo!(ParsedComponentInfoInfo()
           ..componentInfo = componentInfo
           ..propertyList = propertyList
           ..fieldMap = fieldMap);
       }
+      _resetClassState();
     }
-    componentInfo = null;
-    propertyList = [];
+    _currentTargetClassName = previousTargetClassName;
+    _currentClassIsAbstract = previousClassIsAbstract;
   }
 
   @override
   void visitMethodDeclaration(MethodDeclaration node) {
+    if (!_isInTargetClass) {
+      super.visitMethodDeclaration(node);
+      return;
+    }
     super.visitMethodDeclaration(node);
-    if(node.isStatic && !node.name.toString().startsWith("_")){
-      StaticMethodInfo staticMethodInfo = new StaticMethodInfo();
-      staticMethodInfo.name = node.name.toString();
-      staticMethodInfo.introduction = removeDocumentationComment(node.documentationComment?.tokens.join("\n") ?? "");
-      staticMethodInfo.returnType = node.returnType?.type.toString();
-      node.parameters?.parameters.forEach((element) {
-        PropertyInfo info = PropertyInfo();
-        info.name = element.name?.lexeme.toString() ?? "Null";
-        if (element is SimpleFormalParameter) {
-          info.type = element.type.toString();
-        } else if(element is DefaultFormalParameter && element.parameter is SimpleFormalParameter){
-          info.type = (element.parameter as SimpleFormalParameter).type.toString();
-        }
+    final String methodName = node.name.toString();
+    // 私有方法不收录
+    if (methodName.startsWith('_')) {
+      return;
+    }
 
-        info.isRequired =
-            element.isRequiredNamed || element.isRequiredPositional;
-        info.isNamed = element.isNamed;
+    StaticMethodInfo methodInfo = StaticMethodInfo();
+    methodInfo.name = methodName;
+    methodInfo.introduction = removeDocumentationComment(
+        node.documentationComment?.tokens.join('\n') ?? '');
+    methodInfo.returnType = node.returnType?.toSource();
+    node.parameters?.parameters.forEach((FormalParameter element) {
+      methodInfo.params.add(_buildPropertyFromParameter(element));
+    });
 
-        staticMethodInfo.params.add(info);
-      });
-      componentInfo ??= ComponentInfo();
-      componentInfo!.staticMethodList.add(staticMethodInfo);
+    componentInfo ??= ComponentInfo();
+    if (node.isStatic) {
+      componentInfo!.staticMethodList.add(methodInfo);
+    } else if (_currentClassIsAbstract) {
+      // abstract class 的实例方法（含 abstract 方法和带默认实现的可覆写方法）
+      componentInfo!.instanceMethodList.add(methodInfo);
     }
   }
 }
@@ -341,16 +351,16 @@ class ComponentVisitor extends RecursiveElementVisitor<void> {
   }
 
   String getDefaultValue(ParameterElement param) {
-    bool paramIsString = param.type.getDisplayString(withNullability: false) == 'String';
+    final bool paramIsString =
+        param.type.getDisplayString(withNullability: false) == 'String';
     String defaultValue = param.defaultValueCode!;
-    // if (defaultValue == '\'\'') {
-    //   defaultValue = '""';
-    // }
+    if (defaultValue == param.name || defaultValue == 'this.${param.name}') {
+      return '-';
+    }
     if (defaultValue.startsWith("'")) {
       defaultValue = defaultValue.substring(1, defaultValue.length - 1);
     }
-    // print('paramIsString=$paramIsString, defaultValue=$defaultValue');
-    return paramIsString ? defaultValue : '$defaultValue';
+    return paramIsString ? defaultValue : defaultValue;
   }
 
   String? getDescription(String name, List<FieldElement> fields) {

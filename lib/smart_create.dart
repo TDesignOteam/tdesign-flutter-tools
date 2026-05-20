@@ -241,32 +241,51 @@ class SmartCreator {
     File file = File(path);
     await file.create(recursive: false);
     String fileContent = '''
-## API''';
+## API
+''';
     StringBuffer sb = StringBuffer(fileContent);
     for (final apiInfo in parsedComponentInfoList) {
-      if (parsedComponentInfoList.length > 1 && parsedComponentInfoList.indexOf(apiInfo) >= 1) {
+      if (parsedComponentInfoList.indexOf(apiInfo) >= 1) {
         sb.write('\n\n');
       }
       sb.write('### ${apiInfo.componentInfo!.name}');
-      if (commandInfo?.isGetComments ?? false) {
+      final introduction = apiInfo.componentInfo!.introduction ?? '';
+      // 无任何可渲染内容（如 sealed 基类）或有实例方法（如 abstract class），都强制显示简介
+      final hasNoContent = apiInfo.propertyList.isEmpty &&
+          (apiInfo.componentInfo?.constructorMethodList.isEmpty ?? true) &&
+          (apiInfo.componentInfo?.staticMethodList.isEmpty ?? true) &&
+          (apiInfo.componentInfo?.instanceMethodList.isEmpty ?? true);
+      final hasInstanceMethods =
+          apiInfo.componentInfo?.instanceMethodList.isNotEmpty ?? false;
+      if (((commandInfo?.isGetComments ?? false) ||
+              hasNoContent ||
+              hasInstanceMethods) &&
+          introduction.isNotEmpty) {
         sb.write('\n#### 简介\n');
-        sb.write('${apiInfo.componentInfo!.introduction}');
+        sb.write(introduction);
       }
       if (apiInfo.propertyList.isNotEmpty) {
 
-        // 填充introduction
-        apiInfo.propertyList.forEach((element) {
-          if(element.introduction.isEmpty){
-            element.type = apiInfo.fieldMap[element.name]?.type ?? '';
-            element.introduction = apiInfo.fieldMap[element.name]?.introduction ?? '';
+        // 用 fieldMap 补全构造参数缺失的类型和说明
+        for (final PropertyInfo element in apiInfo.propertyList) {
+          final PropertyInfo? field = apiInfo.fieldMap[element.name];
+          if (field == null) {
+            continue;
           }
-        });
+          if (element.type.isEmpty || element.type == '-') {
+            element.type = field.type.isNotEmpty ? field.type : element.type;
+          }
+          if (element.introduction.isEmpty) {
+            element.introduction = field.introduction;
+          }
+        }
         sb.write('\n#### 默认构造方法');
         sb.write('''\n
 | 参数 | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- |\n''');
         for (final item in apiInfo.propertyList) {
-          sb.write('''| ${item.name} | ${item.type} | ${item.defaultValue} | ${item.introduction} |\n''');
+          sb.write(
+              '''| ${sanitizeTableCell(item.name)} | ${sanitizeTableCell(item.type.isEmpty ? '-' : item.type)} | ${sanitizeTableCell(item.defaultValue)} | ${sanitizeTableCell(item.introduction)} |\n''');
         }
       }
       if(apiInfo.componentInfo?.constructorMethodList.isNotEmpty ?? false){
@@ -278,7 +297,8 @@ class SmartCreator {
         // 按照方法名称的首字母排序
         apiInfo.componentInfo!.constructorMethodList.sort((a, b) => a.name!.toLowerCase().compareTo(b.name!.toLowerCase()));
         for (final item in apiInfo.componentInfo!.constructorMethodList) {
-          sb.write('''| ${apiInfo.componentInfo!.name}.${item.name}  | ${item.introduction} |\n''');
+          sb.write(
+              '''| ${apiInfo.componentInfo!.name}.${sanitizeTableCell(item.name)}  | ${sanitizeTableCell(item.introduction)} |\n''');
         }
       }
       if(apiInfo.componentInfo?.staticMethodList.isNotEmpty ?? false){
@@ -290,11 +310,21 @@ class SmartCreator {
         // 按照方法名称的首字母排序
         apiInfo.componentInfo!.staticMethodList.sort((a, b) => a.name!.toLowerCase().compareTo(b.name!.toLowerCase()));
         for (final item in apiInfo.componentInfo!.staticMethodList) {
-          StringBuffer paramsSb = StringBuffer();
-          item.params.forEach((element) {
-            paramsSb.write("  ${element.isRequired ? "required " : ""}${element.type} ${element.name},");
-          });
-          sb.write('''| ${item.name} | ${item.returnType == "null" ? "" : item.returnType} | ${paramsSb.toString()} | ${item.introduction?.replaceAll("\n", "  ")} |\n''');
+          sb.write(
+              '''| ${sanitizeTableCell(item.name)} | ${sanitizeTableCell(item.returnType == "null" ? "" : item.returnType)} | ${sanitizeTableCell(formatMethodParams(item.params))} | ${sanitizeTableCell(item.introduction)} |\n''');
+        }
+      }
+      if(apiInfo.componentInfo?.instanceMethodList.isNotEmpty ?? false){
+        sb.write("\n\n");
+        sb.write("#### 方法");
+        sb.write('''\n
+| 名称 | 返回类型 | 参数 | 说明 |
+| --- | --- | --- | --- |\n''');
+        for (final item in apiInfo.componentInfo!.instanceMethodList) {
+          final returnType =
+              item.returnType == "null" ? "" : (item.returnType ?? "");
+          sb.write(
+              '| ${sanitizeTableCell(item.name)} | ${sanitizeTableCell(returnType)} | ${sanitizeTableCell(formatMethodParams(item.params))} | ${sanitizeTableCell(item.introduction)} |\n');
         }
       }
     }

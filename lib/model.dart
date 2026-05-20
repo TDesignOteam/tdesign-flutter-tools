@@ -62,6 +62,9 @@ class ComponentInfo {
   // 其他构造方法信息
   List<StaticMethodInfo> constructorMethodList = [];
 
+  // 实例方法信息（用于 abstract class 的接口方法文档）
+  List<StaticMethodInfo> instanceMethodList = [];
+
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
       'name': name,
