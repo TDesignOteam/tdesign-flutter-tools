@@ -70,7 +70,7 @@ jobs:
           echo "<!-- AUTO_PREVIEW_HOOK -->" >> pr-comment.md
 
       - name: 更新 PR 预览评论
-        uses: actions-cool/maintain-one-comment@v3
+        uses: TDesignOteam/workflows/actions/maintain-one-comment@main
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           body-path: pr-comment.md
@@ -79,7 +79,7 @@ jobs:
 
       - name: 部署失败时标记 PR 评论
         if: ${{ failure() }}
-        uses: actions-cool/maintain-one-comment@v3
+        uses: TDesignOteam/workflows/actions/maintain-one-comment@main
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           body: ${{ env.FAILURE_BODY }}
@@ -104,7 +104,7 @@ jobs:
         run: echo "number=$(cat pr-number.txt)" >> $GITHUB_OUTPUT
 
       - name: 更新 PR 失败评论
-        uses: actions-cool/maintain-one-comment@v3
+        uses: TDesignOteam/workflows/actions/maintain-one-comment@main
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           body: ${{ env.FAILURE_BODY }}
