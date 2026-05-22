@@ -27,6 +27,16 @@ class SmartUpdater {
   final List<String> folderNameList;
 
   Future<void> run() async {
+    final groupPath = join(basePath!, 'example/lib/widget_group');
+    if (!Directory(groupPath).existsSync()) {
+      stderr.writeln('ERROR: 未找到 example/lib/widget_group');
+      stderr.writeln('develop 等新结构请在组件目录使用 generate；CI 预览见 .github/scripts/');
+      exit(1);
+    }
+    await _updateFromWidgetGroup();
+  }
+
+  Future<void> _updateFromWidgetGroup() async {
     String groupPath = join(basePath!, 'example/lib/widget_group');
     Directory groupDir = Directory(groupPath);
     List<FileSystemEntity> groupFiles = groupDir.listSync();
