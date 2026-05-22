@@ -1,4 +1,4 @@
-# PR 构建：在 tdesign-flutter 中用本 PR tools 重生成文档并产出 artifact（评论见 preview-publish.yml、二进制见 build-multi-platform.yml）
+# PR：用本仓库 tools 构建 tdesign-flutter 预览 + 文档 diff（评论见 preview-publish.yml）
 name: PR 文档预览构建
 
 on:
@@ -15,119 +15,115 @@ permissions:
 
 jobs:
   build:
-    name: 构建文档与预览站
+    name: 构建预览站
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      TOOLS: ${{ github.workspace }}
+      FLUTTER_REPO: tdesign-flutter
     steps:
-      - name: 检出 tdesign-flutter-tools（本 PR）
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: 配置 Git（避免符号链接问题）
-        run: git config --global core.symlinks false
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.32.0"
+          channel: stable
+          cache: true
 
-      - name: 克隆 tdesign-flutter（develop）
+      - name: 静态分析 tools
+        run: |
+          flutter pub get
+          dart analyze --fatal-infos
+
+      - run: git config --global core.symlinks false
+
+      - name: 克隆 tdesign-flutter
         run: git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
 
-      - name: 覆盖依赖为本 PR 的 tdesign_flutter_tools
-        working-directory: tdesign-flutter/tdesign-component
-        env:
-          PR_REPO: ${{ github.event.pull_request.head.repo.full_name }}
-          PR_SHA: ${{ github.event.pull_request.head.sha }}
+      - name: 链接本 PR tools（path，无需 compile）
+        working-directory: ${{ env.FLUTTER_REPO }}/tdesign-component
         run: |
-          cat > pubspec_overrides.yaml <<EOF
+          cat > pubspec_overrides.yaml <<'EOF'
           dependency_overrides:
             tdesign_flutter_tools:
-              git:
-                url: https://github.com/${PR_REPO}.git
-                ref: ${PR_SHA}
+              path: ../../
           EOF
 
-      - name: 安装 pnpm
-        uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@v2
         with:
           version: 9
 
-      - name: 安装 Node.js 20
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "pnpm"
-          cache-dependency-path: "tdesign-flutter/tdesign-site/pnpm-lock.yaml"
+          cache-dependency-path: "${{ env.FLUTTER_REPO }}/tdesign-site/pnpm-lock.yaml"
 
-      - name: 安装 Flutter 3.32
-        uses: TDesignOteam/workflows/actions/setup-flutter@main
+      - uses: TDesignOteam/workflows/actions/setup-flutter@main
         with:
           flutter-version: 3.32.0
           channel: stable
           cache: true
           aop-registry: true
-          aop-project-path: ./tdesign-flutter/tdesign-component/example
+          aop-project-path: ./${{ env.FLUTTER_REPO }}/tdesign-component/example
 
-      - name: Flutter 依赖解析（tdesign-component）
-        working-directory: tdesign-flutter/tdesign-component
+      - name: 依赖解析
+        working-directory: ${{ env.FLUTTER_REPO }}/tdesign-component
         run: flutter pub get
 
-      - name: 用本 PR tools 全量重生成 API 文档
-        working-directory: tdesign-flutter/tdesign-component
-        run: |
-          dart compile exe ${{ github.workspace }}/bin/main.dart -o /tmp/api_tool
-          /tmp/api_tool update
+      - name: 重生成 API 文档
+        working-directory: ${{ env.FLUTTER_REPO }}/tdesign-component
+        run: dart run ${{ env.TOOLS }}/bin/main.dart update
 
-      - name: 运行 widget_test 生成站点 README
-        working-directory: tdesign-flutter/tdesign-component/example
+      - name: 生成站点 README
+        working-directory: ${{ env.FLUTTER_REPO }}/tdesign-component/example
         run: |
           flutter test test/widget_test.dart --reporter expanded || {
-            echo "⚠ Widget test completed with warnings (this is expected)"
+            echo "⚠ widget_test 有告警（可忽略）"
           }
 
-      - name: 构建 tdesign-site 静态站
-        working-directory: tdesign-flutter/tdesign-site
+      - name: 构建站点
+        working-directory: ${{ env.FLUTTER_REPO }}/tdesign-site
         run: |
           pnpm install --frozen-lockfile
           npm run site
 
-      - name: 组装 Surge 预览目录
-        working-directory: tdesign-flutter
+      - name: 组装预览目录
+        working-directory: ${{ env.FLUTTER_REPO }}
         run: |
           mkdir -p ../tdesign-flutter-web/flutter/example/
-          cp -r tdesign-site/_site/* ../tdesign-flutter-web/ || echo "tdesign-site/_site/ not found or empty"
-          rm -rf ../tdesign-flutter-web/assets || true
+          cp -r tdesign-site/_site/* ../tdesign-flutter-web/
           for f in "$GITHUB_WORKSPACE/tdesign-flutter-web/index.html"; do
-            if [ -f "$f" ]; then
-              if ! grep -q '<base href="/">' "$f"; then
-                sed -i 's|<meta http-equiv="X-UA-Compatible" content="ie=edge">|<meta http-equiv="X-UA-Compatible" content="ie=edge">\n  <base href="/">|' "$f" || true
-              fi
-              sed -i "s|src=\"/flutter/|src=\"flutter/|g; s|href=\"/flutter/|href=\"flutter/|g; s|src='/flutter/|src='flutter/|g; s|href='/flutter/|href='flutter/|g" "$f" || true
-            fi
+            [ -f "$f" ] || continue
+            grep -q '<base href="/">' "$f" || sed -i 's|<meta http-equiv="X-UA-Compatible" content="ie=edge">|<meta http-equiv="X-UA-Compatible" content="ie=edge">\n  <base href="/">|' "$f" || true
+            sed -i "s|src=\"/flutter/|src=\"flutter/|g; s|href=\"/flutter/|href=\"flutter/|g" "$f" || true
           done
-          cp -v tdesign-site/_site/index.html ../tdesign-flutter-web/404.html || true
-          cp -v tdesign-site/_site/index.html ../tdesign-flutter-web/200.html || true
-          cp -r tdesign-site/_site/assets ../tdesign-flutter-web/flutter/assets || true
+          cp tdesign-site/_site/index.html ../tdesign-flutter-web/200.html
+          cp tdesign-site/_site/index.html ../tdesign-flutter-web/404.html
+          cp -r tdesign-site/_site/assets ../tdesign-flutter-web/flutter/assets 2>/dev/null || true
 
-      - name: 构建 Flutter Web 示例
-        working-directory: tdesign-flutter/tdesign-component/example
-        run: flutter build web -t ./lib/main.dart --base-href /flutter/example/ --source-maps
+      - name: 构建 Web 示例
+        working-directory: ${{ env.FLUTTER_REPO }}/tdesign-component/example
+        run: flutter build web -t ./lib/main.dart --base-href /flutter/example/
 
-      - name: 拷贝 Web 示例到预览目录
-        working-directory: tdesign-flutter
-        run: cp -r tdesign-component/example/build/web/* ../tdesign-flutter-web/flutter/example/ || true
+      - name: 拷贝 Web 示例
+        working-directory: ${{ env.FLUTTER_REPO }}
+        run: cp -r tdesign-component/example/build/web/* ../tdesign-flutter-web/flutter/example/
 
-      - name: 上传 Surge 预览站产物
-        uses: actions/upload-artifact@v4
+      - name: 生成文档 diff
+        working-directory: ${{ env.FLUTTER_REPO }}
+        run: |
+          dart run ${{ env.TOOLS }}/bin/main.dart doc-diff \
+            --out ${{ env.TOOLS }}/doc-diff-comment.md \
+            --repo .
+
+      - uses: actions/upload-artifact@v4
         with:
           name: tdesign-flutter-web
           path: tdesign-flutter-web
           retention-days: 5
 
-      - name: 生成文档 diff 评论内容（构建成功后）
-        working-directory: tdesign-flutter
-        run: |
-          /tmp/api_tool doc-diff \
-            --out ${{ github.workspace }}/doc-diff-comment.md \
-            --repo .
-
-      - name: 上传文档 diff
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: doc-diff-comment
           path: doc-diff-comment.md
