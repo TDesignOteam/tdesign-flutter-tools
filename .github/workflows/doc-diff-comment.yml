@@ -1,0 +1,72 @@
+# 构建完成后：单独发布「文档变更 diff」PR 评论（与预览评论分离）
+name: PR 文档 diff 评论
+
+on:
+  workflow_run:
+    workflows: ["PR 文档预览构建"]
+    types:
+      - completed
+
+permissions:
+  pull-requests: write
+
+jobs:
+  发布文档-diff评论:
+    runs-on: ubuntu-latest
+    if: >
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success'
+    steps:
+      - name: 下载 PR 元数据
+        uses: actions/download-artifact@v4
+        with:
+          name: pr-metadata
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 解析 PR 编号
+        id: pr
+        run: echo "number=$(cat pr-number.txt)" >> $GITHUB_OUTPUT
+
+      - name: 组装文档 diff 评论正文
+        run: |
+          {
+            echo '<details>'
+            echo '<summary>📄 文档变更 diff（点击展开）</summary>'
+            echo ''
+            cat doc-diff-comment.md
+            echo ''
+            echo '</details>'
+            echo ''
+            echo '<!-- AUTO_DOC_DIFF_HOOK -->'
+          } > pr-doc-diff-comment.md
+
+      - name: 更新 PR 文档 diff 评论
+        uses: TDesignOteam/workflows/actions/maintain-one-comment@main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          body-path: pr-doc-diff-comment.md
+          number: ${{ steps.pr.outputs.number }}
+          body-include: "<!-- AUTO_DOC_DIFF_HOOK -->"
+
+  构建失败通知:
+    runs-on: ubuntu-latest
+    if: >
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'failure'
+    steps:
+      - name: 解析 PR 编号
+        id: pr
+        run: |
+          PR_URL="${{ github.event.workflow_run.pull_requests[0].url }}"
+          echo "number=${PR_URL##*/}" >> $GITHUB_OUTPUT
+
+      - name: 标记文档 diff 评论为构建失败
+        uses: TDesignOteam/workflows/actions/maintain-one-comment@main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          body: |
+            _文档 diff 未生成：预览构建失败。_
+            <!-- AUTO_DOC_DIFF_HOOK -->
+          number: ${{ steps.pr.outputs.number }}
+          body-include: "<!-- AUTO_DOC_DIFF_HOOK -->"
