@@ -101,12 +101,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 组装产物下载链接
+        id: binary-comment
         env:
           GH_REPO: ${{ github.repository }}
           RUN_ID: ${{ github.run_id }}
         run: |
           base="https://github.com/${GH_REPO}/actions/runs/${RUN_ID}"
           {
+            echo 'body<<EOF'
             echo "✅ 编译完成，产物如下："
             echo "- [api_tool_macos_intel](${base}/artifacts)（job: build-macos-intel）"
             echo "- [api_tool_macos_arm64](${base}/artifacts)（job: build-macos-arm64）"
@@ -116,12 +118,13 @@ jobs:
             echo "<!-- AUTO_BINARY_BUILD_HOOK -->"
             echo ""
             echo "_在 Actions 运行页 Artifacts 区域按平台名称下载。_"
-          } > binary-comment.md
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
 
       - name: 更新 PR 评论
         uses: TDesignOteam/workflows/actions/maintain-one-comment@main
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          body-path: binary-comment.md
+          body: ${{ steps.binary-comment.outputs.body }}
           number: ${{ github.event.pull_request.number }}
           body-include: "<!-- AUTO_BINARY_BUILD_HOOK -->"

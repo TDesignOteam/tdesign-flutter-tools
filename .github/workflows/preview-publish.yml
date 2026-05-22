@@ -38,23 +38,26 @@ jobs:
           echo "url=$DEPLOY_DOMAIN" >> $GITHUB_OUTPUT
 
       - name: 组装 PR 预览评论
+        id: preview-comment
         env:
           PREVIEW_URL: ${{ steps.deploy.outputs.url }}
         run: |
           {
+            echo 'body<<EOF'
             printf '%s\n' \
               "<a href=\"${PREVIEW_URL}\"><img height=\"96\" alt=\"完成\" src=\"https://user-images.githubusercontent.com/15634204/150816437-9f5bb788-cd67-4cbc-9897-b82d74e9aa65.png\" /></a>" \
               '' \
               "**预览地址**: [${PREVIEW_URL}](${PREVIEW_URL})" \
               '' \
               '<!-- AUTO_PREVIEW_HOOK -->'
-          } > pr-comment.md
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
 
       - name: 更新 PR 预览评论
         uses: TDesignOteam/workflows/actions/maintain-one-comment@main
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          body-path: pr-comment.md
+          body: ${{ steps.preview-comment.outputs.body }}
           number: ${{ env.PR_NUMBER }}
           body-include: "<!-- AUTO_PREVIEW_HOOK -->"
 
@@ -84,8 +87,10 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 组装文档 diff 评论
+        id: doc-diff-comment
         run: |
           {
+            echo 'body<<EOF'
             if [ -f doc-diff-comment.md ]; then
               cat doc-diff-comment.md
             else
@@ -93,13 +98,14 @@ jobs:
             fi
             echo ''
             echo '<!-- AUTO_DOC_DIFF_HOOK -->'
-          } > pr-doc-diff-comment.md
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
 
       - name: 更新 PR 文档 diff 评论
         uses: TDesignOteam/workflows/actions/maintain-one-comment@main
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          body-path: pr-doc-diff-comment.md
+          body: ${{ steps.doc-diff-comment.outputs.body }}
           number: ${{ env.PR_NUMBER }}
           body-include: "<!-- AUTO_DOC_DIFF_HOOK -->"
 

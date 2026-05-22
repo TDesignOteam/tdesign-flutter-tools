@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:args/command_runner.dart';
-import 'package:tdesign_flutter_tools/doc_diff_comment.dart';
 import 'package:tdesign_flutter_tools/model.dart';
 import 'package:tdesign_flutter_tools/smart_create.dart';
 import 'package:tdesign_flutter_tools/smart_update.dart';
@@ -110,27 +109,6 @@ class UpdateCommand extends Command {
   }
 }
 
-class DocDiffCommand extends Command {
-  @override
-  String name = 'doc-diff';
-
-  @override
-  String description = '基于 git diff 生成 PR 文档变更评论 Markdown。';
-
-  DocDiffCommand() {
-    argParser.addOption('out', help: '输出 Markdown 路径', mandatory: true);
-    argParser.addOption('repo', help: 'tdesign-flutter 根目录', defaultsTo: '.');
-  }
-
-  @override
-  void run() async {
-    await DocDiffComment(
-      repoRoot: argResults!['repo'] as String,
-      outPath: argResults!['out'] as String,
-    ).write();
-  }
-}
-
 void main(List<String> arguments) {
   if (Platform.environment['CI'] != 'true') {
     final sb = StringBuffer('命令行参数:\n');
@@ -143,6 +121,5 @@ void main(List<String> arguments) {
   CommandRunner('tdesign_flutter_tools', 'TDesign Flutter component documentation tools.')
     ..addCommand(CreateCommand())
     ..addCommand(UpdateCommand())
-    ..addCommand(DocDiffCommand())
     ..run(arguments);
 }

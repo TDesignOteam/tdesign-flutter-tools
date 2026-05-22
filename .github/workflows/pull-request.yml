@@ -71,9 +71,9 @@ jobs:
         working-directory: ${{ env.FLUTTER_REPO }}/tdesign-component
         run: flutter pub get
 
-      - name: 重生成 API 文档
+      - name: 重生成 API 文档（CI 脚本，不写回 flutter 仓库）
         working-directory: ${{ env.FLUTTER_REPO }}/tdesign-component
-        run: dart run ${{ env.TOOLS }}/bin/main.dart update
+        run: dart run ${{ env.TOOLS }}/.github/scripts/regenerate_api_for_diff.dart
 
       - name: 生成站点 README
         working-directory: ${{ env.FLUTTER_REPO }}/tdesign-component/example
@@ -113,7 +113,7 @@ jobs:
       - name: 生成文档 diff
         working-directory: ${{ env.FLUTTER_REPO }}
         run: |
-          dart run ${{ env.TOOLS }}/bin/main.dart doc-diff \
+          dart run ${{ env.TOOLS }}/.github/scripts/build_doc_diff_comment.dart \
             --out ${{ env.TOOLS }}/doc-diff-comment.md \
             --repo .
 
