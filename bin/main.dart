@@ -132,65 +132,15 @@ class DocDiffCommand extends Command {
 }
 
 void main(List<String> arguments) {
-  // generate --file lib/src/components/text/td_text.dart --name TDText --folder-name text --only-api
-  // arguments = [
-  //   'generate',
-  //   '--file',
-  //   '/Users/x/WorkSpace/flutter/tdesign_group/tdesign-flutter/demo_tool/../lib/src/components/text/td_text.dart',
-  //   '--name',
-  //   'TDTextSpan',
-  //   '--folder-name',
-  //   'text',
-  //   '--output',
-  //   '/Users/x/WorkSpace/flutter/tdesign_group/tdesign-flutter/demo_tool/../example/assets/api/',
-  //   '--only-api',
-  //   '--get-comments'
-  // ];
-  // arguments = [
-  //   'generate',
-  //   '--file',
-  //   '/Users/x/WorkSpace/flutter/tdesign_group/tdesign-flutter/demo_tool/../lib/src/components/toast/td_toast.dart',
-  //   '--name',
-  //   'TDToast',
-  //   '--folder-name',
-  //   'toast',
-  //   '--output',
-  //   '/Users/x/WorkSpace/flutter/tdesign_group/tdesign-flutter/demo_tool/../example/assets/api/',
-  //   '--only-api',
-  //   '--get-comments'
-  // ];
-  // arguments = [
-  //   'generate',
-  //   '--folder',
-  //   '/Users/x/WorkSpace/flutter/tdesign_group/tdesign-mobile-flutter/tdesign-component/demo_tool/../lib/src/components/tag',
-  //   '--name',
-  //   'TDTagStyle',
-  //   '--folder-name',
-  //   'tag',
-  //   '--output',
-  //   '/Users/x/WorkSpace/flutter/tdesign_group/tdesign-mobile-flutter/tdesign-component/demo_tool/../example/assets/api2/',
-  //   '--only-api'
-  // ];
+  if (Platform.environment['CI'] != 'true') {
+    final sb = StringBuffer('命令行参数:\n');
+    for (final arg in arguments) {
+      sb.writeln(arg);
+    }
+    print(sb);
+  }
 
-  // generate
-  // --folder
-  // ../lib/src/components/tag
-  // --name
-  // TDTag,TDSelectTag,TDTagStyle
-  // --folder-name
-  // tag
-  // --output
-  // ../example/assets/api/
-  // --only-api
-
-  StringBuffer sb = StringBuffer();
-  sb.writeln("命令行参数:");
-  arguments.forEach((element) {
-    sb.writeln(element);
-  });
-  print(sb);
-
-  CommandRunner('demo', 'Tencent AI Education Component Tools.')
+  CommandRunner('tdesign_flutter_tools', 'TDesign Flutter component documentation tools.')
     ..addCommand(CreateCommand())
     ..addCommand(UpdateCommand())
     ..addCommand(DocDiffCommand())

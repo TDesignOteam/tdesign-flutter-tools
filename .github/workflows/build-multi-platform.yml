@@ -1,0 +1,127 @@
+name: Build Multi-Platform Binaries
+
+on:
+  pull_request:
+    branches: [develop, main]
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: pr-binaries-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  build-macos-intel:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.32.0"
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: dart compile exe bin/main.dart -o api_tool_macos_intel
+      - name: Verify binary
+        run: |
+          git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
+          dart run .github/scripts/cross_platform_verify.dart tdesign-flutter api_tool_macos_intel
+      - uses: actions/upload-artifact@v4
+        with:
+          name: api_tool_macos_intel
+          path: api_tool_macos_intel
+
+  build-macos-arm64:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.32.0"
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: dart compile exe bin/main.dart -o api_tool_macos_arm64 --target-os=macos --target-arch=arm64
+      - name: Verify binary
+        run: |
+          git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
+          dart run .github/scripts/cross_platform_verify.dart tdesign-flutter api_tool_macos_arm64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: api_tool_macos_arm64
+          path: api_tool_macos_arm64
+
+  build-linux-x64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.32.0"
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: dart compile exe bin/main.dart -o api_tool_linux --target-arch=x64
+      - name: Verify binary
+        run: |
+          git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
+          dart run .github/scripts/cross_platform_verify.dart tdesign-flutter api_tool_linux
+      - uses: actions/upload-artifact@v4
+        with:
+          name: api_tool_linux
+          path: api_tool_linux
+
+  build-windows-x64:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.32.0"
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: dart compile exe bin/main.dart -o api_tool_windows.exe
+      - name: Verify binary
+        shell: bash
+        run: |
+          git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
+          dart run .github/scripts/cross_platform_verify.dart tdesign-flutter api_tool_windows.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: api_tool_windows
+          path: api_tool_windows.exe
+
+  comment-on-pr:
+    name: 更新二进制产物 PR 评论
+    needs: [build-macos-intel, build-macos-arm64, build-linux-x64, build-windows-x64]
+    runs-on: ubuntu-latest
+    steps:
+      - name: 组装产物下载链接
+        env:
+          GH_REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          base="https://github.com/${GH_REPO}/actions/runs/${RUN_ID}"
+          {
+            echo "✅ 编译完成，产物如下："
+            echo "- [api_tool_macos_intel](${base}/artifacts)（job: build-macos-intel）"
+            echo "- [api_tool_macos_arm64](${base}/artifacts)（job: build-macos-arm64）"
+            echo "- [api_tool_linux](${base}/artifacts)（job: build-linux-x64）"
+            echo "- [api_tool_windows](${base}/artifacts)（job: build-windows-x64）"
+            echo ""
+            echo "<!-- AUTO_BINARY_BUILD_HOOK -->"
+            echo ""
+            echo "_在 Actions 运行页 Artifacts 区域按平台名称下载。_"
+          } > binary-comment.md
+
+      - name: 更新 PR 评论
+        uses: TDesignOteam/workflows/actions/maintain-one-comment@main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          body-path: binary-comment.md
+          number: ${{ github.event.pull_request.number }}
+          body-include: "<!-- AUTO_BINARY_BUILD_HOOK -->"

@@ -42,7 +42,10 @@ class DocDiffComment {
     final git = ['-C', repoRoot];
 
     final names = await Process.run('git', [...git, 'diff', '--name-only', '--', ..._gitPaths]);
-    _exitIfFail(names, 'git diff --name-only');
+    // git diff 有变更时 exit 0；仅当命令本身失败才退出
+    if (names.exitCode > 1) {
+      _exitIfFail(names, 'git diff --name-only');
+    }
     for (final line in '${names.stdout}'.split('\n')) {
       if (line.trim().isNotEmpty) paths.add(line.trim());
     }

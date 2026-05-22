@@ -1,4 +1,4 @@
-# PR 构建：在 tdesign-flutter 中用本 PR tools 重生成文档，并产出预览站 artifact（发布与评论见 preview-publish.yml）
+# PR 构建：在 tdesign-flutter 中用本 PR tools 重生成文档并产出 artifact（评论见 preview-publish.yml、二进制见 build-multi-platform.yml）
 name: PR 文档预览构建
 
 on:
@@ -6,37 +6,24 @@ on:
     branches: [develop, main]
     types: [opened, synchronize, reopened]
 
+concurrency:
+  group: pr-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
 jobs:
-  analyze:
-    name: 静态分析 tools
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: 检出 tdesign-flutter-tools
-        uses: actions/checkout@v4
-
-      - name: 安装 Flutter 3.32
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: "3.32.0"
-          channel: stable
-          cache: true
-
-      - name: 依赖解析
-        run: flutter pub get
-
-      - name: dart analyze
-        run: dart analyze --fatal-infos
-
-  构建文档与预览站:
+  build:
+    name: 构建文档与预览站
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
       - name: 检出 tdesign-flutter-tools（本 PR）
         uses: actions/checkout@v4
+
+      - name: 配置 Git（避免符号链接问题）
+        run: git config --global core.symlinks false
 
       - name: 克隆 tdesign-flutter（develop）
         run: git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
@@ -139,14 +126,9 @@ jobs:
             --out ${{ github.workspace }}/doc-diff-comment.md \
             --repo .
 
-      - name: 写入 PR 元数据
-        run: echo "${{ github.event.number }}" > pr-number.txt
-
-      - name: 上传 PR 元数据（编号 + 文档 diff）
+      - name: 上传文档 diff
         uses: actions/upload-artifact@v4
         with:
-          name: pr-metadata
-          path: |
-            pr-number.txt
-            doc-diff-comment.md
+          name: doc-diff-comment
+          path: doc-diff-comment.md
           retention-days: 5

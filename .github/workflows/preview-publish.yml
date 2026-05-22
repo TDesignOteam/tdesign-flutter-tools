@@ -1,5 +1,5 @@
-# 构建完成后：部署 Surge 预览，并更新 PR 预览评论（文档 diff 见 doc-diff-comment.yml）
-name: PR 预览发布
+# 预览构建完成后：Surge 部署 + 预览/文档 diff 两条 PR 评论（二进制评论见 build-multi-platform.yml）
+name: PR 评论发布
 
 on:
   workflow_run:
@@ -8,34 +8,20 @@ on:
       - completed
 
 env:
-  BUILD_FAILURE_BODY: |
-    [<img height="96" alt="失败" src="https://user-images.githubusercontent.com/5378891/75333447-1e63a280-58c1-11ea-975d-235367fd1522.png">](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }})
-    <!-- AUTO_PREVIEW_HOOK -->
-  DEPLOY_FAILURE_BODY: |
-    [<img height="96" alt="失败" src="https://user-images.githubusercontent.com/5378891/75333447-1e63a280-58c1-11ea-975d-235367fd1522.png">](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-    <!-- AUTO_PREVIEW_HOOK -->
+  PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+  BUILD_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }}
 
 permissions:
   pull-requests: write
 
 jobs:
-  部署预览并评论:
+  deploy-preview:
+    name: 部署预览并评论
     runs-on: ubuntu-latest
     if: >
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.conclusion == 'success'
     steps:
-      - name: 下载 PR 元数据
-        uses: actions/download-artifact@v4
-        with:
-          name: pr-metadata
-          run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: 解析 PR 编号
-        id: pr
-        run: echo "number=$(cat pr-number.txt)" >> $GITHUB_OUTPUT
-
       - name: 下载 Surge 预览站产物
         uses: actions/download-artifact@v4
         with:
@@ -47,11 +33,11 @@ jobs:
       - name: 部署到 Surge
         id: deploy
         run: |
-          DEPLOY_DOMAIN=https://preview-pr-${{ steps.pr.outputs.number }}-${{ github.event.repository.name }}.surge.sh
+          DEPLOY_DOMAIN=https://preview-pr-${{ env.PR_NUMBER }}-${{ github.event.repository.name }}.surge.sh
           npx surge --project ./tdesign-flutter-web --domain $DEPLOY_DOMAIN --token ${{ secrets.TDESIGN_SURGE_TOKEN }}
           echo "url=$DEPLOY_DOMAIN" >> $GITHUB_OUTPUT
 
-      - name: 组装 PR 预览评论正文
+      - name: 组装 PR 预览评论
         env:
           PREVIEW_URL: ${{ steps.deploy.outputs.url }}
         run: |
@@ -69,34 +55,82 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           body-path: pr-comment.md
-          number: ${{ steps.pr.outputs.number }}
+          number: ${{ env.PR_NUMBER }}
           body-include: "<!-- AUTO_PREVIEW_HOOK -->"
 
-      - name: 部署失败时标记 PR 评论
+      - name: 部署失败时更新预览评论
         if: failure()
         uses: TDesignOteam/workflows/actions/maintain-one-comment@main
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          body: ${{ env.DEPLOY_FAILURE_BODY }}
-          number: ${{ steps.pr.outputs.number }}
+          body: |
+            [<img height="96" alt="失败" src="https://user-images.githubusercontent.com/5378891/75333447-1e63a280-58c1-11ea-975d-235367fd1522.png">](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            <!-- AUTO_PREVIEW_HOOK -->
+          number: ${{ env.PR_NUMBER }}
           body-include: "<!-- AUTO_PREVIEW_HOOK -->"
 
-  构建失败通知:
+  publish-doc-diff:
+    name: 发布文档 diff 评论
+    runs-on: ubuntu-latest
+    if: >
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success'
+    steps:
+      - name: 下载文档 diff
+        uses: actions/download-artifact@v4
+        with:
+          name: doc-diff-comment
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 组装文档 diff 评论
+        run: |
+          {
+            if [ -f doc-diff-comment.md ]; then
+              cat doc-diff-comment.md
+            else
+              echo '_文档 diff 内容缺失。_'
+            fi
+            echo ''
+            echo '<!-- AUTO_DOC_DIFF_HOOK -->'
+          } > pr-doc-diff-comment.md
+
+      - name: 更新 PR 文档 diff 评论
+        uses: TDesignOteam/workflows/actions/maintain-one-comment@main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          body-path: pr-doc-diff-comment.md
+          number: ${{ env.PR_NUMBER }}
+          body-include: "<!-- AUTO_DOC_DIFF_HOOK -->"
+
+  notify-preview-failure:
+    name: 预览构建失败
     runs-on: ubuntu-latest
     if: >
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.conclusion == 'failure'
     steps:
-      - name: 解析 PR 编号
-        id: pr
-        run: |
-          PR_URL="${{ github.event.workflow_run.pull_requests[0].url }}"
-          echo "number=${PR_URL##*/}" >> $GITHUB_OUTPUT
-
-      - name: 更新 PR 失败评论
-        uses: TDesignOteam/workflows/actions/maintain-one-comment@main
+      - uses: TDesignOteam/workflows/actions/maintain-one-comment@main
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          body: ${{ env.BUILD_FAILURE_BODY }}
-          number: ${{ steps.pr.outputs.number }}
+          body: |
+            [<img height="96" alt="失败" src="https://user-images.githubusercontent.com/5378891/75333447-1e63a280-58c1-11ea-975d-235367fd1522.png">](${{ env.BUILD_RUN_URL }})
+            <!-- AUTO_PREVIEW_HOOK -->
+          number: ${{ env.PR_NUMBER }}
           body-include: "<!-- AUTO_PREVIEW_HOOK -->"
+
+  notify-doc-diff-failure:
+    name: 文档 diff 构建失败
+    runs-on: ubuntu-latest
+    if: >
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'failure'
+    steps:
+      - uses: TDesignOteam/workflows/actions/maintain-one-comment@main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          body: |
+            _文档 diff 未生成：预览构建失败。_
+            <!-- AUTO_DOC_DIFF_HOOK -->
+          number: ${{ env.PR_NUMBER }}
+          body-include: "<!-- AUTO_DOC_DIFF_HOOK -->"
