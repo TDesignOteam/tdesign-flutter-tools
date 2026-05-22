@@ -1,0 +1,130 @@
+# PR：用本仓库 tools 构建 tdesign-flutter 预览 + 文档 diff（评论见 preview-publish.yml）
+name: PR 文档预览构建
+
+on:
+  pull_request:
+    branches: [develop, main]
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: pr-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: 构建预览站
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      TOOLS: ${{ github.workspace }}
+      FLUTTER_REPO: tdesign-flutter
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.32.0"
+          channel: stable
+          cache: true
+
+      - name: 静态分析 tools
+        run: |
+          flutter pub get
+          dart analyze --fatal-infos
+
+      - run: git config --global core.symlinks false
+
+      - name: 克隆 tdesign-flutter
+        run: git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
+
+      - name: 链接本 PR tools（path，无需 compile）
+        working-directory: ${{ env.FLUTTER_REPO }}/tdesign-component
+        run: |
+          cat > pubspec_overrides.yaml <<'EOF'
+          dependency_overrides:
+            tdesign_flutter_tools:
+              path: ../../
+          EOF
+
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+          cache-dependency-path: "${{ env.FLUTTER_REPO }}/tdesign-site/pnpm-lock.yaml"
+
+      - uses: TDesignOteam/workflows/actions/setup-flutter@main
+        with:
+          flutter-version: 3.32.0
+          channel: stable
+          cache: true
+          aop-registry: true
+          aop-project-path: ./${{ env.FLUTTER_REPO }}/tdesign-component/example
+
+      - name: 依赖解析
+        working-directory: ${{ env.FLUTTER_REPO }}/tdesign-component
+        run: flutter pub get
+
+      - name: 重生成 API 文档（CI 脚本，不写回 flutter 仓库）
+        working-directory: ${{ env.FLUTTER_REPO }}/tdesign-component
+        run: dart run ${{ env.TOOLS }}/.github/scripts/regenerate_api_for_diff.dart
+
+      - name: 生成站点 README
+        working-directory: ${{ env.FLUTTER_REPO }}/tdesign-component/example
+        run: |
+          flutter test test/widget_test.dart --reporter expanded || {
+            echo "⚠ widget_test 有告警（可忽略）"
+          }
+
+      - name: 构建站点
+        working-directory: ${{ env.FLUTTER_REPO }}/tdesign-site
+        run: |
+          pnpm install --frozen-lockfile
+          npm run site
+
+      - name: 组装预览目录
+        working-directory: ${{ env.FLUTTER_REPO }}
+        run: |
+          mkdir -p ../tdesign-flutter-web/flutter/example/
+          cp -r tdesign-site/_site/* ../tdesign-flutter-web/
+          for f in "$GITHUB_WORKSPACE/tdesign-flutter-web/index.html"; do
+            [ -f "$f" ] || continue
+            grep -q '<base href="/">' "$f" || sed -i 's|<meta http-equiv="X-UA-Compatible" content="ie=edge">|<meta http-equiv="X-UA-Compatible" content="ie=edge">\n  <base href="/">|' "$f" || true
+            sed -i "s|src=\"/flutter/|src=\"flutter/|g; s|href=\"/flutter/|href=\"flutter/|g" "$f" || true
+          done
+          cp tdesign-site/_site/index.html ../tdesign-flutter-web/200.html
+          cp tdesign-site/_site/index.html ../tdesign-flutter-web/404.html
+          cp -r tdesign-site/_site/assets ../tdesign-flutter-web/flutter/assets 2>/dev/null || true
+
+      - name: 构建 Web 示例
+        working-directory: ${{ env.FLUTTER_REPO }}/tdesign-component/example
+        run: flutter build web -t ./lib/main.dart --base-href /flutter/example/
+
+      - name: 拷贝 Web 示例
+        working-directory: ${{ env.FLUTTER_REPO }}
+        run: cp -r tdesign-component/example/build/web/* ../tdesign-flutter-web/flutter/example/
+
+      - name: 生成文档 diff
+        working-directory: ${{ env.FLUTTER_REPO }}
+        run: |
+          dart run ${{ env.TOOLS }}/.github/scripts/build_doc_diff_comment.dart \
+            --out ${{ env.TOOLS }}/doc-diff-comment.md \
+            --repo .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tdesign-flutter-web
+          path: tdesign-flutter-web
+          retention-days: 5
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: doc-diff-comment
+          path: doc-diff-comment.md
+          retention-days: 5

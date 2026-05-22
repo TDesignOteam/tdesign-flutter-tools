@@ -18,13 +18,11 @@ void main(List<String> args) async {
   print('Binary: $binaryAbsPath');
   print('Repo:   $componentDir');
 
-  // 验证二进制文件存在
   if (!File(binaryAbsPath).existsSync()) {
     print('ERROR: Binary not found: $binaryAbsPath');
     exit(1);
   }
 
-  // 用一个真实的 dart 文件测试 generate 命令
   final testFile = '$componentDir/lib/src/components/button/t_button.dart';
   if (!File(testFile).existsSync()) {
     print('ERROR: Test file not found: $testFile');
@@ -52,7 +50,6 @@ void main(List<String> args) async {
     exit(result.exitCode);
   }
 
-  // 验证输出文件生成
   final outputFile = File('${outputDir}button_api.md');
   if (outputFile.existsSync()) {
     print('\nSUCCESS: button_api.md generated (${outputFile.lengthSync()} bytes)');
