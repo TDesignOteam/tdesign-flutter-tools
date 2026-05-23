@@ -5,11 +5,10 @@ import 'package:tdesign_flutter_tools/component_rule.dart';
 import 'package:tdesign_flutter_tools/model.dart';
 import 'package:test/test.dart';
 
-const String _componentRoot =
-    '/Users/rs/Documents/cursor/tdesign-flutter/tdesign-component';
+import 'support/component_paths.dart';
 
 List<ParsedComponentInfoInfo> _analyse(List<String> names, String relPath) {
-  final path = '$_componentRoot/$relPath';
+  final String path = componentSourcePath(relPath);
   final col = AnalysisContextCollection(
     includedPaths: [path],
     resourceProvider: PhysicalResourceProvider.INSTANCE,
@@ -38,7 +37,6 @@ void main() {
     expect(contextParam.isNamed, isFalse);
     expect(contextParam.type, 'BuildContext');
 
-    // positional 参数排在命名参数之前
     final firstParam = info.propertyList.first;
     expect(firstParam.name, 'context');
     expect(firstParam.isNamed, isFalse);

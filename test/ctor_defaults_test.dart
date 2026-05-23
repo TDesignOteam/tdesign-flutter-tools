@@ -4,9 +4,11 @@ import 'package:analyzer/file_system/physical_file_system.dart';
 import 'package:tdesign_flutter_tools/component_rule.dart';
 import 'package:test/test.dart';
 
+import 'support/component_paths.dart';
+
 List<dynamic> _analyse(List<String> names) {
-  final path =
-      '/Users/rs/Documents/cursor/tdesign-flutter/tdesign-component/lib/src/components/popup/t_popup_panel.dart';
+  const String relPath = 'lib/src/components/popup/t_popup_panel.dart';
+  final String path = componentSourcePath(relPath);
   final col = AnalysisContextCollection(
     includedPaths: [path],
     resourceProvider: PhysicalResourceProvider.INSTANCE,

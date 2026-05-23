@@ -4,7 +4,10 @@ import 'package:analyzer/file_system/physical_file_system.dart';
 import 'package:tdesign_flutter_tools/component_rule.dart';
 import 'package:test/test.dart';
 
-List<dynamic> _analyse(List<String> names, String path) {
+import 'support/component_paths.dart';
+
+List<dynamic> _analyse(List<String> names, String relPath) {
+  final String path = componentSourcePath(relPath);
   final col = AnalysisContextCollection(
     includedPaths: [path],
     resourceProvider: PhysicalResourceProvider.INSTANCE,
@@ -16,15 +19,16 @@ List<dynamic> _analyse(List<String> names, String path) {
     isGrammarParser: false,
     nameList: names,
     folderName: 'popup',
-    sourceFileName: path.split('/').last,
+    sourceFileName: relPath.split('/').last,
   ).analyse();
 }
 
 void main() {
   test('auto includes SlideTransitionFrom when parsing TSlidePopupRoute file', () {
-    final path =
-        '/Users/rs/Documents/cursor/tdesign-flutter/tdesign-component/lib/src/components/popup/t_popup_route.dart';
-    final list = _analyse(['TSlidePopupRoute'], path);
+    final list = _analyse(
+      ['TSlidePopupRoute'],
+      'lib/src/components/popup/t_popup_route.dart',
+    );
     final names = list.map((e) => e.componentInfo!.name).toList();
     expect(names, contains('SlideTransitionFrom'));
     final enumInfo =
@@ -35,9 +39,10 @@ void main() {
   });
 
   test('auto includes PopupClick when parsing popup panel file', () {
-    final path =
-        '/Users/rs/Documents/cursor/tdesign-flutter/tdesign-component/lib/src/components/popup/t_popup_panel.dart';
-    final list = _analyse(['TPopupBottomDisplayPanel'], path);
+    final list = _analyse(
+      ['TPopupBottomDisplayPanel'],
+      'lib/src/components/popup/t_popup_panel.dart',
+    );
     final names = list.map((e) => e.componentInfo!.name).toList();
     expect(names, contains('PopupClick'));
     final typedefInfo =
