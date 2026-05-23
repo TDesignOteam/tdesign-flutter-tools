@@ -1,0 +1,64 @@
+# 只读校验：tdesign_api.yaml 清单 + analyzer AST validate，不写回 tdesign-flutter 源码
+name: API 文档合规性校验
+
+on:
+  pull_request:
+    branches: [develop, main]
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [develop, main]
+  workflow_dispatch:
+
+concurrency:
+  group: api-compliance-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: "3.32.0"
+  FLUTTER_REPO: tdesign-flutter
+  FLUTTER_BRANCH: develop
+
+jobs:
+  validate-api-docs:
+    name: YAML 清单 + AST 合规性
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: 检出 tools 仓库
+        uses: actions/checkout@v4
+
+      - name: 安装 Flutter / Dart
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: 解析 tools 依赖
+        run: flutter pub get
+
+      - name: 静态分析 tools
+        run: dart analyze --fatal-infos
+
+      - name: 单元测试（完备性相关）
+        run: |
+          dart test test/aux_types_test.dart \
+                   test/ctor_defaults_test.dart \
+                   test/duplicate_source_test.dart \
+                   test/factory_ctor_test.dart \
+                   test/enum_members_test.dart \
+                   test/positional_ctor_test.dart
+
+      - name: 克隆 tdesign-flutter（只读，用于读取已提交的 *_api.md）
+        run: |
+          git clone --depth 1 --branch "${FLUTTER_BRANCH}" \
+            https://github.com/Tencent/tdesign-flutter.git "${FLUTTER_REPO}"
+
+      - name: 运行 AST 完备性检测（非零 exit code 即失败）
+        run: |
+          dart run bin/main.dart validate \
+            --component-root "${{ github.workspace }}/${FLUTTER_REPO}/tdesign-component" \
+            --config .github/config/tdesign_api.yaml

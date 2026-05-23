@@ -1,0 +1,66 @@
+# CI 专用：API 文档合规性审计清单
+# 说明：此文件仅用于 tdesign-flutter-tools 仓库的 CI，不会写入 tdesign-component 源码。
+# 注意：不要放在 .github/workflows/ —— 该目录下所有 .yaml 都会被 GitHub 当作 workflow 解析。
+# 与 demo_tool/all_build.sh 中重点抽测的 5 个组件 --name 配置对齐。
+
+version: 1
+
+components:
+  button:
+    folder_name: button
+    source_folder: lib/src/components/button
+    classes:
+      - TButton
+      - TButtonStyle
+
+  picker:
+    folder_name: picker
+    source_folder: lib/src/components/picker
+    classes:
+      - TPicker
+      - TPickerOption
+      - TPickerValue
+      - TPickerLoadEvent
+      - TPickerColumns
+      - TPickerLinked
+      - TPickerItems
+      - TPickerKeys
+
+  popup:
+    folder_name: popup
+    source_folder: lib/src/components/popup
+    classes:
+      - TSlidePopupRoute
+      - TPopupBottomDisplayPanel
+      - TPopupBottomConfirmPanel
+      - TPopupCenterPanel
+
+  dialog:
+    folder_name: dialog
+    source_folder: lib/src/components/dialog
+    classes:
+      - TAlertDialog
+      - TConfirmDialog
+      - TDialogButtonOptions
+      - TDialogButtonStyle
+      - TDialogScaffold
+      - TDialogTitle
+      - TDialogContent
+      - TDialogInfoWidget
+      - HorizontalNormalButtons
+      - HorizontalTextButtons
+      - TDialogButton
+      - TDialogImagePosition
+      - TImageDialog
+      - TInputDialog
+
+  calendar:
+    folder_name: calendar
+    source_folder: lib/src/components/calendar
+    classes:
+      - TCalendar
+      - TCalendarPopup
+      - TCalendarStyle
+      - TCalendarDataSource
+      - TLunarInfo
+      - TCalendarDateType

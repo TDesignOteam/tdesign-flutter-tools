@@ -23,7 +23,6 @@ class SmartCreator {
     this.folderName,
     this.output,
     this.isFileMode,
-    this.isMerge = false,
     this.onlyApi = false,
     this.isGrammarParser = false,
   });
@@ -34,7 +33,6 @@ class SmartCreator {
   final String? folderName; // 文件夹名称
   final String? output; // 输出文件夹名称
   final bool? isFileMode; // 是否是单文件模式
-  final bool isMerge; // 是否合并在一个文件夹中
   final bool? onlyApi;
   final bool? isGrammarParser; //是否使用语法分析器
   final CommandInfo? commandInfo;
@@ -95,6 +93,60 @@ class SmartCreator {
             resourceProvider: PhysicalResourceProvider.INSTANCE,
           );
     return analyseFile(analysisContextCollection, files, startTime);
+  }
+
+  /// 仅解析源码（不写入 md），供完备性检测等场景复用与 generate 相同的 AST 规则。
+  Future<List<ParsedComponentInfoInfo>> parseOnly({bool quiet = false}) async {
+    final List<String> files = _collectSourceFiles();
+    if (files.isEmpty) {
+      return <ParsedComponentInfoInfo>[];
+    }
+    final int startTime = DateTime.now().microsecondsSinceEpoch;
+    if (!quiet) {
+      final String? sdkPath = await _detectSdkPath();
+      if (sdkPath != null && sdkPath.isNotEmpty) {
+        AnsiPen pen = AnsiPen()..green(bold: true);
+        print(pen('Detected Dart SDK: $sdkPath'));
+      }
+    }
+    final String? sdkPath = await _detectSdkPath();
+    final AnalysisContextCollection analysisContextCollection =
+        (sdkPath != null && sdkPath.isNotEmpty)
+            ? AnalysisContextCollection(
+                includedPaths: files,
+                excludedPaths: [],
+                resourceProvider: PhysicalResourceProvider.INSTANCE,
+                sdkPath: sdkPath,
+              )
+            : AnalysisContextCollection(
+                includedPaths: files,
+                excludedPaths: [],
+                resourceProvider: PhysicalResourceProvider.INSTANCE,
+              );
+    return _parseComponents(analysisContextCollection, files, startTime,
+        quiet: quiet);
+  }
+
+  List<String> _collectSourceFiles() {
+    final List<String> files = <String>[];
+    if (isFileMode!) {
+      String filePath = join(basePath!, path);
+      filePath = normalize(filePath);
+      if (File(filePath).existsSync()) {
+        files.add(filePath);
+      }
+    } else {
+      final String fullPath = normalize(join(basePath!, path));
+      final Directory comDir = Directory(fullPath);
+      if (comDir.existsSync()) {
+        for (final FileSystemEntity item in comDir.listSync()) {
+          if (item.path.endsWith('.dart')) {
+            files.add(item.path);
+          }
+        }
+      }
+    }
+    return files;
   }
 
   // Attempt to detect Dart SDK path using multiple strategies:
@@ -173,26 +225,35 @@ class SmartCreator {
     return null;
   }
 
-  Future<void> analyseFile(AnalysisContextCollection analysisContextCollection, List<String> paths, int startTime) async {
-    // print('${DateTime.now().toLocal()}  analyseFile');
-    List<ParsedComponentInfoInfo> parsedComponentInfoList = [];
+  Future<List<ParsedComponentInfoInfo>> _parseComponents(
+    AnalysisContextCollection analysisContextCollection,
+    List<String> paths,
+    int startTime, {
+    bool quiet = false,
+  }) async {
+    final List<ParsedComponentInfoInfo> parsedComponentInfoList =
+        <ParsedComponentInfoInfo>[];
     for (final String filePath in paths) {
-      print('\n\n${DateTime.now().toLocal()}  开始分析 ${basename(filePath)}');
-      String normalizedPath = normalize(filePath);
+      if (!quiet) {
+        print('\n\n${DateTime.now().toLocal()}  开始分析 ${basename(filePath)}');
+      }
+      final String normalizedPath = normalize(filePath);
       ParsedUnitResult? unit;
       ResolvedUnitResult? unit2;
       if (isGrammarParser!) {
-        // 在新版本的analyzer中，getResolvedUnit方法返回的是SomeResolvedUnitResult
-        var result = await analysisContextCollection.contextFor(normalizedPath).currentSession.getResolvedUnit(normalizedPath);
-        // 将SomeResolvedUnitResult转换为ResolvedUnitResult
+        final result = await analysisContextCollection
+            .contextFor(normalizedPath)
+            .currentSession
+            .getResolvedUnit(normalizedPath);
         unit2 = result as ResolvedUnitResult?;
       } else {
-        // 在新版本的analyzer中，getParsedUnit方法返回的是SomeParsedUnitResult
-        var result = analysisContextCollection.contextFor(normalizedPath).currentSession.getParsedUnit(normalizedPath);
-        // 将SomeParsedUnitResult转换为ParsedUnitResult
+        final result = analysisContextCollection
+            .contextFor(normalizedPath)
+            .currentSession
+            .getParsedUnit(normalizedPath);
         unit = result as ParsedUnitResult?;
       }
-      ComponentRule issuesInFile = ComponentRule(
+      final ComponentRule issuesInFile = ComponentRule(
         parsedUnitResult: unit,
         resolvedUnitResult: unit2,
         isGrammarParser: isGrammarParser,
@@ -200,25 +261,46 @@ class SmartCreator {
         basePath: basePath,
         folderName: folderName,
         startTime: startTime,
-        isMerge: isMerge,
         sourceFileName: basename(filePath),
       );
-      int endTime = DateTime.now().microsecondsSinceEpoch;
-      print('${isGrammarParser! ? "语法分析" : "词法分析"}执行用时: ${((endTime - startTime) / 1000).floor()}ms');
-      // print('${DateTime.now().toLocal()}  开始解析 ${basename(filePath)}');
-
-      List<ParsedComponentInfoInfo> items = issuesInFile.analyse();
-      parsedComponentInfoList.addAll(items);
+      if (!quiet) {
+        final int endTime = DateTime.now().microsecondsSinceEpoch;
+        print(
+            '${isGrammarParser! ? "语法分析" : "词法分析"}执行用时: ${((endTime - startTime) / 1000).floor()}ms');
+      }
+      parsedComponentInfoList.addAll(issuesInFile.analyse());
     }
-    // 按照 nameList 的顺序对解析结果进行排序，确保输出顺序与用户输入顺序一致
-    parsedComponentInfoList.sort((a, b) {
+    reportDuplicateAuxiliaryDefinitions(parsedComponentInfoList);
+
+    int kindOrder(ParsedComponentInfoInfo info) {
+      switch (info.componentInfo?.kind) {
+        case 'enum':
+          return 1;
+        case 'typedef':
+          return 2;
+        default:
+          return 0;
+      }
+    }
+
+    parsedComponentInfoList.sort((ParsedComponentInfoInfo a,
+            ParsedComponentInfoInfo b) {
+      final int kindCmp = kindOrder(a).compareTo(kindOrder(b));
+      if (kindCmp != 0) {
+        return kindCmp;
+      }
       int indexA = nameList!.indexOf(a.componentInfo!.name!);
       int indexB = nameList!.indexOf(b.componentInfo!.name!);
-      // 找不到的元素排到最后
       if (indexA == -1) indexA = nameList!.length;
       if (indexB == -1) indexB = nameList!.length;
       return indexA.compareTo(indexB);
     });
+    return parsedComponentInfoList;
+  }
+
+  Future<void> analyseFile(AnalysisContextCollection analysisContextCollection, List<String> paths, int startTime) async {
+    final List<ParsedComponentInfoInfo> parsedComponentInfoList =
+        await _parseComponents(analysisContextCollection, paths, startTime);
     await generateApiInfoFile(parsedComponentInfoList);
     if (!onlyApi! && parsedComponentInfoList.isNotEmpty) {
       await generateBaseInfoFile(parsedComponentInfoList.first.componentInfo!, commandInfo!);
@@ -250,8 +332,54 @@ class SmartCreator {
       }
       sb.write('### ${apiInfo.componentInfo!.name}');
       final introduction = apiInfo.componentInfo!.introduction ?? '';
+      final String kind = apiInfo.componentInfo?.kind ?? 'class';
+
+      if (kind == 'enum') {
+        if (introduction.isNotEmpty) {
+          sb.write('\n#### 简介\n');
+          sb.write(introduction);
+        }
+        final List<EnumMemberInfo> enumMembers =
+            apiInfo.componentInfo!.enumMembers;
+        if (enumMembers.isNotEmpty) {
+          sb.write('\n#### 枚举值\n');
+          sb.write('''\n
+| 名称 | 说明 |
+| --- | --- |\n''');
+          for (final EnumMemberInfo member in enumMembers) {
+            final String doc =
+                member.introduction.isEmpty ? '-' : member.introduction;
+            sb.write(
+                '| ${sanitizeTableCell(member.name)} | ${sanitizeTableCell(doc)} |\n');
+          }
+        } else if (apiInfo.componentInfo!.enumValues.isNotEmpty) {
+          sb.write('\n#### 枚举值\n');
+          sb.write('''\n
+| 名称 | 说明 |
+| --- | --- |\n''');
+          for (final String value in apiInfo.componentInfo!.enumValues) {
+            sb.write('| ${sanitizeTableCell(value)} | - |\n');
+          }
+        }
+        continue;
+      }
+
+      if (kind == 'typedef') {
+        if (introduction.isNotEmpty) {
+          sb.write('\n#### 简介\n');
+          sb.write(introduction);
+        }
+        if (apiInfo.componentInfo!.typedefDefinition.isNotEmpty) {
+          sb.write('\n#### 类型定义\n\n');
+          sb.write('```dart\n${apiInfo.componentInfo!.typedefDefinition}\n```\n');
+        }
+        continue;
+      }
+
       // 无任何可渲染内容（如 sealed 基类）或有实例方法（如 abstract class），都强制显示简介
       final hasNoContent = apiInfo.propertyList.isEmpty &&
+          apiInfo.extraPropertyList.isEmpty &&
+          apiInfo.staticMemberList.isEmpty &&
           (apiInfo.componentInfo?.constructorMethodList.isEmpty ?? true) &&
           (apiInfo.componentInfo?.staticMethodList.isEmpty ?? true) &&
           (apiInfo.componentInfo?.instanceMethodList.isEmpty ?? true);
@@ -264,8 +392,25 @@ class SmartCreator {
         sb.write('\n#### 简介\n');
         sb.write(introduction);
       }
-      if (apiInfo.propertyList.isNotEmpty) {
+      void writePropertyTable(
+        List<PropertyInfo> items, {
+        required String header,
+        String nameColumn = '参数',
+      }) {
+        if (items.isEmpty) {
+          return;
+        }
+        sb.write('\n#### $header');
+        sb.write('''\n
+| $nameColumn | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |\n''');
+        for (final PropertyInfo item in items) {
+          sb.write(
+              '''| ${sanitizeTableCell(item.name)} | ${sanitizeTableCell(item.type.isEmpty ? '-' : item.type)} | ${sanitizeTableCell(item.defaultValue)} | ${sanitizeTableCell(item.introduction)} |\n''');
+        }
+      }
 
+      if (apiInfo.propertyList.isNotEmpty) {
         // 用 fieldMap 补全构造参数缺失的类型和说明
         for (final PropertyInfo element in apiInfo.propertyList) {
           final PropertyInfo? field = apiInfo.fieldMap[element.name];
@@ -279,26 +424,34 @@ class SmartCreator {
             element.introduction = field.introduction;
           }
         }
-        sb.write('\n#### 默认构造方法');
-        sb.write('''\n
+        writePropertyTable(apiInfo.propertyList, header: '默认构造方法');
+      }
+      writePropertyTable(apiInfo.extraPropertyList,
+          header: '公开属性', nameColumn: '属性');
+      writePropertyTable(apiInfo.staticMemberList,
+          header: '静态成员', nameColumn: '名称');
+      if (apiInfo.componentInfo?.constructorMethodList.isNotEmpty ?? false) {
+        sb.write('\n\n');
+        sb.write('#### 工厂构造方法');
+        apiInfo.componentInfo!.constructorMethodList.sort((StaticMethodInfo a,
+                StaticMethodInfo b) =>
+            a.name!.toLowerCase().compareTo(b.name!.toLowerCase()));
+        for (final StaticMethodInfo item
+            in apiInfo.componentInfo!.constructorMethodList) {
+          sb.write(
+              '\n\n##### ${apiInfo.componentInfo!.name}.${sanitizeTableCell(item.name)}');
+          if (item.introduction != null && item.introduction!.isNotEmpty) {
+            sb.write('\n\n${item.introduction}');
+          }
+          if (item.params.isNotEmpty) {
+            sb.write('''\n
 | 参数 | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- |\n''');
-        for (final item in apiInfo.propertyList) {
-          sb.write(
-              '''| ${sanitizeTableCell(item.name)} | ${sanitizeTableCell(item.type.isEmpty ? '-' : item.type)} | ${sanitizeTableCell(item.defaultValue)} | ${sanitizeTableCell(item.introduction)} |\n''');
-        }
-      }
-      if(apiInfo.componentInfo?.constructorMethodList.isNotEmpty ?? false){
-        sb.write("\n\n");
-        sb.write("#### 工厂构造方法");
-        sb.write('''\n
-| 名称  | 说明 |
-| --- |  --- |\n''');
-        // 按照方法名称的首字母排序
-        apiInfo.componentInfo!.constructorMethodList.sort((a, b) => a.name!.toLowerCase().compareTo(b.name!.toLowerCase()));
-        for (final item in apiInfo.componentInfo!.constructorMethodList) {
-          sb.write(
-              '''| ${apiInfo.componentInfo!.name}.${sanitizeTableCell(item.name)}  | ${sanitizeTableCell(item.introduction)} |\n''');
+            for (final PropertyInfo param in item.params) {
+              sb.write(
+                  '''| ${sanitizeTableCell(param.name)} | ${sanitizeTableCell(param.type.isEmpty ? '-' : param.type)} | ${sanitizeTableCell(param.defaultValue)} | ${sanitizeTableCell(param.introduction)} |\n''');
+            }
+          }
         }
       }
       if(apiInfo.componentInfo?.staticMethodList.isNotEmpty ?? false){

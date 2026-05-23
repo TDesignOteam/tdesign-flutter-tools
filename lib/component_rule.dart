@@ -3,8 +3,6 @@ import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/visitor.dart';
-import 'package:collection/collection.dart';
-
 import 'model.dart';
 import 'util.dart';
 
@@ -20,7 +18,6 @@ class ComponentRule {
         this.nameList,
         this.basePath,
         this.folderName,
-        this.isMerge,
         this.sourceFileName});
 
   final ParsedUnitResult? parsedUnitResult; //词法分析
@@ -30,7 +27,6 @@ class ComponentRule {
   final String? folderName;
   final String? sourceFileName;
   final int? startTime;
-  final bool? isMerge;
   final bool? isGrammarParser;
 
   List<ParsedComponentInfoInfo> analyse() {
@@ -42,7 +38,6 @@ class ComponentRule {
           basePath: basePath,
           onParsedComponentInfoInfo: (ParsedComponentInfoInfo info) {
             parsedComponentInfoList.add(info);
-            // print('添加解析结果：${info.componentInfo.name}');
           },
           sourceFileName: sourceFileName);
       resolvedUnitResult!.libraryElement.accept(visitor);
@@ -53,18 +48,12 @@ class ComponentRule {
           folderName: folderName,
           onParsedComponentInfoInfo: (ParsedComponentInfoInfo info) {
             parsedComponentInfoList.add(info);
-            Debug.red('添加解析结果：${info.componentInfo!.name}');
           },
           sourceFileName: sourceFileName);
       parsedUnitResult!.unit.accept(visitor);
     }
-    // int endTime1 = DateTime.now().microsecondsSinceEpoch;
-    // print('语法分析完毕!  用时: ${((endTime1 - startTime1) / 1000).floor()}ms');
-    // analysisResult.unit.accept(visitor);
-
     int endTime = DateTime.now().microsecondsSinceEpoch;
     print('analyse 执行用时: ${((endTime - startTime1) / 1000).floor()}ms');
-    // print('${nameList.join(',')} 生成完毕!  用时: ${((endTime - startTime) / 1000).floor()}ms');
     print('$sourceFileName 生成完毕');
     return parsedComponentInfoList;
   }
@@ -80,7 +69,21 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
   final OnParsedComponentInfoInfo? onParsedComponentInfoInfo;
   ComponentInfo? componentInfo;
   List<PropertyInfo> propertyList = [];
-  Map<String,PropertyInfo> fieldMap = {};
+  List<PropertyInfo> extraPropertyList = [];
+  List<PropertyInfo> staticMemberList = [];
+  Map<String, PropertyInfo> fieldMap = {};
+  final Set<String> _constructorParamNames = {};
+  /// 当前文件内所有类的字段快照，用于解析 super.xxx 类型
+  final Map<String, Map<String, PropertyInfo>> _allClassFieldMaps = {};
+  /// 各类默认构造的形式参数默认值（用于 super.xxx 未显式写默认值时）
+  final Map<String, Map<String, String>> _allClassConstructorDefaults = {};
+  bool _targetFoundInUnit = false;
+  final List<EnumDeclaration> _pendingEnums = [];
+  final List<GenericTypeAlias> _pendingTypedefs = [];
+  final Set<String> _emittedAuxiliaryNames = {};
+  // 当前正在解析的类名（文件内任意类）
+  String? _currentClassName;
+  String? _currentClassSuperName;
   // 当前正在解析的目标类名（null 表示不在目标类内）
   String? _currentTargetClassName;
   // 当前正在解析的类是否是 abstract class（用于收集实例方法）
@@ -88,42 +91,166 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
 
   bool get _isInTargetClass => _currentTargetClassName != null;
 
+  void _emitParsedInfo(ParsedComponentInfoInfo info) {
+    info.componentInfo?.sourceFile = sourceFileName;
+    onParsedComponentInfoInfo?.call(info);
+  }
+
+  ParsedComponentInfoInfo _emptyParsedInfo(ComponentInfo componentInfo) {
+    return ParsedComponentInfoInfo()
+      ..componentInfo = componentInfo
+      ..propertyList = <PropertyInfo>[]
+      ..extraPropertyList = <PropertyInfo>[]
+      ..staticMemberList = <PropertyInfo>[]
+      ..fieldMap = <String, PropertyInfo>{};
+  }
+
+  void _emitEnum(EnumDeclaration node) {
+    final String name = node.name.lexeme;
+    if (_emittedAuxiliaryNames.contains(name)) {
+      return;
+    }
+    _emittedAuxiliaryNames.add(name);
+    final ComponentInfo componentInfo = ComponentInfo()
+      ..name = name
+      ..kind = 'enum';
+    if (node.documentationComment != null) {
+      componentInfo.introduction = removeDocumentationComment(
+        node.documentationComment!.tokens.join('\n'),
+      );
+    }
+    for (final EnumConstantDeclaration constant in node.constants) {
+      final EnumMemberInfo member = EnumMemberInfo()
+        ..name = constant.name.lexeme;
+      if (constant.documentationComment != null) {
+        member.introduction = removeDocumentationComment(
+          constant.documentationComment!.tokens.join('\n'),
+        );
+      }
+      componentInfo.enumMembers.add(member);
+    }
+    componentInfo.enumValues =
+        componentInfo.enumMembers.map((EnumMemberInfo m) => m.name).toList();
+    _emitParsedInfo(_emptyParsedInfo(componentInfo));
+  }
+
+  void _emitTypedef(GenericTypeAlias node) {
+    final String name = node.name.lexeme;
+    if (_emittedAuxiliaryNames.contains(name)) {
+      return;
+    }
+    _emittedAuxiliaryNames.add(name);
+    final ComponentInfo componentInfo = ComponentInfo()
+      ..name = name
+      ..kind = 'typedef'
+      ..typedefDefinition = 'typedef ${node.name.lexeme} = ${node.type.toSource()};';
+    if (node.documentationComment != null) {
+      componentInfo.introduction = removeDocumentationComment(
+        node.documentationComment!.tokens.join('\n'),
+      );
+    }
+    _emitParsedInfo(_emptyParsedInfo(componentInfo));
+  }
+
+  void _flushPendingAuxiliaryTypes() {
+    if (!_targetFoundInUnit) {
+      return;
+    }
+    for (final EnumDeclaration node in _pendingEnums) {
+      _emitEnum(node);
+    }
+    for (final GenericTypeAlias node in _pendingTypedefs) {
+      _emitTypedef(node);
+    }
+    _pendingEnums.clear();
+    _pendingTypedefs.clear();
+  }
+
   void _resetClassState() {
     componentInfo = null;
     propertyList = [];
+    extraPropertyList = [];
+    staticMemberList = [];
     fieldMap = {};
+    _constructorParamNames.clear();
     _currentTargetClassName = null;
     _currentClassIsAbstract = false;
+    _currentClassSuperName = null;
+  }
+
+  PropertyInfo _copyPropertyInfo(PropertyInfo source) {
+    return PropertyInfo()
+      ..name = source.name
+      ..type = source.type
+      ..isRequired = source.isRequired
+      ..isNamed = source.isNamed
+      ..introduction = source.introduction
+      ..defaultValue = source.defaultValue;
+  }
+
+  String? _parseSuperClassName(ClassDeclaration node) {
+    final ExtendsClause? extendsClause = node.extendsClause;
+    if (extendsClause == null) {
+      return null;
+    }
+    final TypeAnnotation superClass = extendsClause.superclass;
+    if (superClass is NamedType) {
+      return superClass.name2.lexeme;
+    }
+    return superClass.toString();
+  }
+
+  void _saveClassFieldMap(String className) {
+    final Map<String, PropertyInfo> snapshot = <String, PropertyInfo>{};
+    for (final MapEntry<String, PropertyInfo> entry in fieldMap.entries) {
+      snapshot[entry.key] = _copyPropertyInfo(entry.value);
+    }
+    _allClassFieldMaps[className] = snapshot;
   }
 
   PropertyInfo _buildPropertyFromParameter(FormalParameter param) {
     final PropertyInfo item = PropertyInfo();
-    item.name = param.name?.lexeme.toString() ?? '';
+    item.name = formalParameterName(param);
     item.isRequired =
         param.isRequired || param.toSource().toString().startsWith('@required');
     item.isNamed = param.isNamed;
-    item.type = extractFormalParameterType(param);
+    item.type = extractFormalParameterType(
+      param,
+      superClassFieldMaps: _allClassFieldMaps[_currentClassSuperName],
+    );
+    String? rawDefault = extractFormalParameterDefaultValue(param);
+    if ((rawDefault == null || rawDefault.trim().isEmpty) &&
+        param is SuperFormalParameter &&
+        _currentClassSuperName != null) {
+      rawDefault = _allClassConstructorDefaults[_currentClassSuperName]?[item.name];
+    }
     item.defaultValue = formatDefaultValueForDoc(
-      extractFormalParameterDefaultValue(param),
+      rawDefault,
       paramName: item.name,
       isRequired: item.isRequired,
     );
     return item;
   }
 
-  void _mergeExtraFieldsIntoPropertyList() {
+  void _splitFieldsBeyondConstructor() {
     for (final MapEntry<String, PropertyInfo> entry in fieldMap.entries) {
       if (entry.key.startsWith('_')) {
         continue;
       }
-      final bool exists =
-          propertyList.any((PropertyInfo element) => element.name == entry.key);
-      if (!exists) {
-        final PropertyInfo field = entry.value;
-        field.name = entry.key;
-        propertyList.add(field);
+      if (_constructorParamNames.contains(entry.key)) {
+        continue;
+      }
+      final PropertyInfo field = _copyPropertyInfo(entry.value)..name = entry.key;
+      if (entry.value.isStatic) {
+        staticMemberList.add(field);
+      } else {
+        extraPropertyList.add(field);
       }
     }
+    extraPropertyList.sort((PropertyInfo a, PropertyInfo b) =>
+        a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    staticMemberList.sort((PropertyInfo a, PropertyInfo b) =>
+        a.name.toLowerCase().compareTo(b.name.toLowerCase()));
   }
 
   void _fillPropertyFromFieldMap(PropertyInfo item) {
@@ -139,19 +266,72 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
     }
   }
 
+  void _finalizeConstructorMethodParams() {
+    if (componentInfo == null) {
+      return;
+    }
+    for (final StaticMethodInfo method in componentInfo!.constructorMethodList) {
+      for (final PropertyInfo param in method.params) {
+        _fillPropertyFromFieldMap(param);
+        if ((param.defaultValue == '-' || param.defaultValue.isEmpty) &&
+            _currentClassSuperName != null) {
+          final String? parentDefault =
+              _allClassConstructorDefaults[_currentClassSuperName]?[param.name];
+          if (parentDefault != null &&
+              parentDefault.isNotEmpty &&
+              parentDefault != '-') {
+            param.defaultValue = parentDefault;
+          }
+        }
+        if (param.type.isEmpty) {
+          param.type = '-';
+        }
+      }
+    }
+  }
+
+  void _sortPropertyListPreservingPositional() {
+    final List<PropertyInfo> positional =
+        propertyList.where((PropertyInfo p) => !p.isNamed).toList();
+    final List<PropertyInfo> named = propertyList
+        .where((PropertyInfo p) => p.isNamed)
+        .toList()
+      ..sort((PropertyInfo a, PropertyInfo b) =>
+          a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    propertyList
+      ..clear()
+      ..addAll(positional)
+      ..addAll(named);
+  }
+
   @override
   void visitConstructorDeclaration(ConstructorDeclaration node) {
-    if (!_isInTargetClass) {
+    if (_currentClassName == null) {
       node.visitChildren(this);
       return;
     }
     node.visitChildren(this);
     if (node.name == null) {
+      final Map<String, String> ctorDefaults = <String, String>{};
       for (final FormalParameter param in node.parameters.parameters) {
-        Debug.yellow('构造参数[$folderName]: ${param.toSource()}');
-        propertyList.add(_buildPropertyFromParameter(param));
+        final PropertyInfo built = _buildPropertyFromParameter(param);
+        final String? raw = extractFormalParameterDefaultValue(param);
+        if (raw != null && raw.trim().isNotEmpty) {
+          ctorDefaults[built.name] = formatDefaultValueForDoc(
+            raw,
+            paramName: built.name,
+            isRequired: built.isRequired,
+          );
+        }
+        if (_isInTargetClass) {
+          propertyList.add(built);
+          if (built.name.isNotEmpty) {
+            _constructorParamNames.add(built.name);
+          }
+        }
       }
-    } else {
+      _allClassConstructorDefaults[_currentClassName!] = ctorDefaults;
+    } else if (_isInTargetClass) {
       // 记录工厂构造方法
       final StaticMethodInfo staticMethodInfo = StaticMethodInfo();
       staticMethodInfo.name = node.name.toString();
@@ -163,13 +343,11 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
       componentInfo ??= ComponentInfo();
       componentInfo!.constructorMethodList.add(staticMethodInfo);
     }
-    Debug.green(
-        '构造函数[$folderName]: ${node.name ?? 'default'} | ${node.parameters.parameters.map((FormalParameter e) => e.name?.lexeme).join('|')}');
   }
 
   @override
   void visitFieldDeclaration(FieldDeclaration node) {
-    if (!_isInTargetClass) {
+    if (_currentClassName == null) {
       node.visitChildren(this);
       return;
     }
@@ -181,11 +359,11 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
     if (fieldName.startsWith('_')) {
       return;
     }
-    PropertyInfo? item =
-        propertyList.firstWhereOrNull((PropertyInfo element) => element.name == fieldName);
+    PropertyInfo? item = fieldMap[fieldName];
     item ??= PropertyInfo()..name = fieldName;
     fieldMap[fieldName] = item;
-    item.type = node.fields.type.toString();
+    item.isStatic = node.staticKeyword != null;
+    item.type = node.fields.type?.toString() ?? '';
     if (node.documentationComment != null) {
       item.introduction = removeDocumentationComment(
         node.documentationComment!.tokens.join('\n'),
@@ -193,60 +371,121 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
     } else if (node.beginToken.toString().startsWith('///')) {
       item.introduction = removeDocumentationComment(node.beginToken.toString());
     }
-    Debug.blue('成员变量[$folderName]: $fieldName | ${item.type}');
   }
 
   @override
-  void visitComment(Comment node) {
-    node.visitChildren(this);
-    String token = node.tokens.map((e) => e.toString()).toList().join('|');
-    String tmp = '';
-    if (node.childEntities.isNotEmpty) {
-      tmp = node.childEntities.map((e) => e.toString()).toList().join('|');
+  void visitCompilationUnit(CompilationUnit node) {
+    _targetFoundInUnit = false;
+    _pendingEnums.clear();
+    _pendingTypedefs.clear();
+    _emittedAuxiliaryNames.clear();
+    super.visitCompilationUnit(node);
+    _flushPendingAuxiliaryTypes();
+  }
+
+  @override
+  void visitEnumDeclaration(EnumDeclaration node) {
+    final String enumName = node.name.lexeme;
+    if (enumName.startsWith('_')) {
+      return;
     }
-    List<String> strList = [];
-    strList.add(node.isDocumentation.toString());
-    strList.add(token);
-    strList.add(node.runtimeType.toString());
-    strList.add(node.childEntities.length.toString());
-    strList.add(tmp);
-    Debug('注释[$folderName]: ${strList.join(', ')}');
+    if (nameList!.contains(enumName)) {
+      _emitEnum(node);
+    } else {
+      _pendingEnums.add(node);
+    }
+  }
+
+  @override
+  void visitGenericTypeAlias(GenericTypeAlias node) {
+    final String aliasName = node.name.lexeme;
+    if (aliasName.startsWith('_')) {
+      return;
+    }
+    if (nameList!.contains(aliasName)) {
+      _emitTypedef(node);
+    } else {
+      _pendingTypedefs.add(node);
+    }
   }
 
   @override
   void visitClassDeclaration(ClassDeclaration node) {
-    final bool isTarget = nameList!.contains(node.name.toString());
+    final String className = node.name.toString();
+    final bool isTarget = nameList!.contains(className);
+    if (isTarget) {
+      _targetFoundInUnit = true;
+    }
+    final String? previousClassName = _currentClassName;
+    final String? previousSuperClassName = _currentClassSuperName;
+    final Map<String, PropertyInfo> previousFieldMap = fieldMap;
     final String? previousTargetClassName = _currentTargetClassName;
     final bool previousClassIsAbstract = _currentClassIsAbstract;
+
+    _currentClassName = className;
+    fieldMap = <String, PropertyInfo>{};
+    _currentClassSuperName = _parseSuperClassName(node);
+
     if (isTarget) {
-      _currentTargetClassName = node.name.toString();
+      _currentTargetClassName = className;
       _currentClassIsAbstract = node.abstractKeyword != null;
+      propertyList = <PropertyInfo>[];
+      extraPropertyList = <PropertyInfo>[];
+      staticMemberList = <PropertyInfo>[];
+      _constructorParamNames.clear();
     }
+
     node.visitChildren(this);
+    _saveClassFieldMap(className);
+
     if (isTarget) {
       componentInfo ??= ComponentInfo();
-      componentInfo!.name = node.name.toString();
+      componentInfo!.name = className;
       if (node.documentationComment != null) {
         componentInfo!.introduction = removeDocumentationComment(
             node.documentationComment!.tokens.join('\n'));
       }
-      _mergeExtraFieldsIntoPropertyList();
+      _splitFieldsBeyondConstructor();
       for (final PropertyInfo item in propertyList) {
         _fillPropertyFromFieldMap(item);
+        if ((item.defaultValue == '-' || item.defaultValue.isEmpty) &&
+            _currentClassSuperName != null) {
+          final String? parentDefault =
+              _allClassConstructorDefaults[_currentClassSuperName]?[item.name];
+          if (parentDefault != null &&
+              parentDefault.isNotEmpty &&
+              parentDefault != '-') {
+            item.defaultValue = parentDefault;
+          }
+        }
         if (item.type.isEmpty) {
           item.type = '-';
         }
       }
-      propertyList.sort(
-          (PropertyInfo a, PropertyInfo b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-      if (onParsedComponentInfoInfo != null) {
-        onParsedComponentInfoInfo!(ParsedComponentInfoInfo()
-          ..componentInfo = componentInfo
-          ..propertyList = propertyList
-          ..fieldMap = fieldMap);
+      for (final PropertyInfo item in extraPropertyList) {
+        if (item.type.isEmpty) {
+          item.type = '-';
+        }
       }
+      for (final PropertyInfo item in staticMemberList) {
+        if (item.type.isEmpty) {
+          item.type = '-';
+        }
+      }
+      _finalizeConstructorMethodParams();
+      _sortPropertyListPreservingPositional();
+      _emitParsedInfo(ParsedComponentInfoInfo()
+        ..componentInfo = componentInfo
+        ..propertyList = propertyList
+        ..extraPropertyList = extraPropertyList
+        ..staticMemberList = staticMemberList
+        ..fieldMap = fieldMap);
       _resetClassState();
     }
+
+    _currentClassName = previousClassName;
+    _currentClassSuperName = previousSuperClassName;
+    fieldMap = previousFieldMap;
     _currentTargetClassName = previousTargetClassName;
     _currentClassIsAbstract = previousClassIsAbstract;
   }
@@ -302,7 +541,10 @@ class ComponentVisitor extends RecursiveElementVisitor<void> {
       if (onParsedComponentInfoInfo != null) {
         onParsedComponentInfoInfo!(ParsedComponentInfoInfo()
           ..componentInfo = componentInfo
-          ..propertyList = propertyList);
+          ..propertyList = propertyList
+          ..extraPropertyList = <PropertyInfo>[]
+          ..staticMemberList = <PropertyInfo>[]
+          ..fieldMap = <String, PropertyInfo>{});
       }
     }
   }
@@ -315,8 +557,6 @@ class ComponentVisitor extends RecursiveElementVisitor<void> {
       componentInfo.introduction = removeDocumentationComment(
           element.documentationComment!);
     }
-    // print('\n组件基本信息：');
-    // print('$componentInfo');
     return componentInfo;
   }
 
@@ -339,11 +579,6 @@ class ComponentVisitor extends RecursiveElementVisitor<void> {
       }
       propertyList.add(item);
     }
-    // print('\n组件属性信息：');
-    // for (final item in propertyList) {
-    //   print(item);
-    // }
-    
     // 按照属性名称的首字母排序
     propertyList.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
     

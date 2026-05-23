@@ -6,7 +6,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TOOLS_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-COMPONENT_DIR="$(cd "${TOOLS_DIR}/../tdesign-component" && pwd)"
+COMPONENT_DIR="$(cd "${TOOLS_DIR}/../tdesign-flutter/tdesign-component" && pwd)"
 TARGET="${1:-picker}"
 
 cd "${COMPONENT_DIR}"
