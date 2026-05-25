@@ -298,7 +298,6 @@ Future<List<CompletenessIssue>> auditComponent({
     basePath: basePath,
     path: config.sourceFolder,
     folderName: config.folderName,
-    isGrammarParser: false,
   ).parseOnly(quiet: quiet);
 
   final Map<String, ParsedComponentInfoInfo> parsedByName =

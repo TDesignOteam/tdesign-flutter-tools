@@ -206,7 +206,6 @@ class CommandInfo {
   String? folderName = '';
   String? output = '';
   bool isOnlyApi = false;
-  bool isUseGrammar = false;
   bool isGetComments = false;
 
   // 命令是否有效
@@ -243,7 +242,6 @@ class CommandInfo {
     sb.write('folderName: $folderName\n');
     sb.write('output: $output\n');
     sb.write('isOnlyApi: $isOnlyApi\n');
-    sb.write('isUseGrammar: $isUseGrammar\n');
     sb.write('widgetNames: $widgetNames\n');
     return sb.toString();
   }

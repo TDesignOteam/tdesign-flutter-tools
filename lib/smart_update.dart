@@ -82,7 +82,6 @@ class SmartUpdater {
               nameList: componentInfo.commandInfo!.widgetNames!.split(','),
               basePath: basePath,
               path: isFileMode ? componentInfo.commandInfo!.file : componentInfo.commandInfo!.folder,
-              isGrammarParser: false,
               folderName: componentInfo.commandInfo!.folderName);
           await creator.run();
         }

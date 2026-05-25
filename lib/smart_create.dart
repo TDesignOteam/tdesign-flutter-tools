@@ -24,7 +24,6 @@ class SmartCreator {
     this.output,
     this.isFileMode,
     this.onlyApi = false,
-    this.isGrammarParser = false,
   });
 
   final String? path; //文件相对路径
@@ -34,7 +33,6 @@ class SmartCreator {
   final String? output; // 输出文件夹名称
   final bool? isFileMode; // 是否是单文件模式
   final bool? onlyApi;
-  final bool? isGrammarParser; //是否使用语法分析器
   final CommandInfo? commandInfo;
 
   Future<void> run() async {
@@ -238,25 +236,13 @@ class SmartCreator {
         print('\n\n${DateTime.now().toLocal()}  开始分析 ${basename(filePath)}');
       }
       final String normalizedPath = normalize(filePath);
-      ParsedUnitResult? unit;
-      ResolvedUnitResult? unit2;
-      if (isGrammarParser!) {
-        final result = await analysisContextCollection
-            .contextFor(normalizedPath)
-            .currentSession
-            .getResolvedUnit(normalizedPath);
-        unit2 = result as ResolvedUnitResult?;
-      } else {
-        final result = analysisContextCollection
-            .contextFor(normalizedPath)
-            .currentSession
-            .getParsedUnit(normalizedPath);
-        unit = result as ParsedUnitResult?;
-      }
+      final result = analysisContextCollection
+          .contextFor(normalizedPath)
+          .currentSession
+          .getParsedUnit(normalizedPath);
+      final ParsedUnitResult? unit = result as ParsedUnitResult?;
       final ComponentRule issuesInFile = ComponentRule(
         parsedUnitResult: unit,
-        resolvedUnitResult: unit2,
-        isGrammarParser: isGrammarParser,
         nameList: nameList,
         basePath: basePath,
         folderName: folderName,
@@ -265,8 +251,7 @@ class SmartCreator {
       );
       if (!quiet) {
         final int endTime = DateTime.now().microsecondsSinceEpoch;
-        print(
-            '${isGrammarParser! ? "语法分析" : "词法分析"}执行用时: ${((endTime - startTime) / 1000).floor()}ms');
+        print('词法分析执行用时: ${((endTime - startTime) / 1000).floor()}ms');
       }
       parsedComponentInfoList.addAll(issuesInFile.analyse());
     }
@@ -511,9 +496,6 @@ class SmartCreator {
     }
     if (commandInfo.isOnlyApi) {
       sb.write('isOnlyApi: ${commandInfo.isOnlyApi}\n');
-    }
-    if (commandInfo.isUseGrammar) {
-      sb.write('isUseGrammar: ${commandInfo.isUseGrammar}\n');
     }
     sb.write('widgetNames: ${commandInfo.widgetNames}');
 

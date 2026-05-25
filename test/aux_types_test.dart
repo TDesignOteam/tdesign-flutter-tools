@@ -16,7 +16,6 @@ List<dynamic> _analyse(List<String> names, String relPath) {
       as ParsedUnitResult;
   return ComponentRule(
     parsedUnitResult: parsed,
-    isGrammarParser: false,
     nameList: names,
     folderName: 'popup',
     sourceFileName: relPath.split('/').last,

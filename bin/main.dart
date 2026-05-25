@@ -23,7 +23,6 @@ class CreateCommand extends Command {
     argParser.addOption('folder-name', help: '[可选]生成的组件示例文件夹名称,默认文件夹名称是第一项name的下划线表示');
     argParser.addOption('output', help: '文件输出路径');
     argParser.addFlag('only-api', defaultsTo: false, help: '是否只生成api文件');
-    argParser.addFlag('use-grammar', defaultsTo: false, help: '是否采用语法分析器,默认采用词法分析');
     argParser.addFlag('get-comments', defaultsTo: false, help: '是否获取类的注释');
   }
 
@@ -40,8 +39,6 @@ class CreateCommand extends Command {
     commandInfo.output = argResults!['output'];
     bool onlyApi = argResults!['only-api'] ?? false;
     commandInfo.isOnlyApi = onlyApi;
-    bool isGrammarParser = argResults!['use-grammar'] ?? false;
-    commandInfo.isUseGrammar = isGrammarParser;
     commandInfo.widgetNames = argResults!['name'].toString();
     commandInfo.isGetComments = argResults!['get-comments'] ?? false;
     return commandInfo;
@@ -62,7 +59,6 @@ class CreateCommand extends Command {
       isFileMode = false;
     }
     bool? onlyApi = argResults!['only-api'];
-    bool? isGrammarParser = argResults!['use-grammar'];
     print('${DateTime.now().toLocal()}  ${argResults!['name']} 正在生成组件文档...');
     // print('原始命令：${getCommandInfo()}');
     SmartCreator creator = SmartCreator(
@@ -73,7 +69,6 @@ class CreateCommand extends Command {
         basePath: '${Directory.current.path}/',
         path: path,
         output: argResults!['output'],
-        isGrammarParser: isGrammarParser,
         commandInfo: getCommandInfo(),
         folderName: folderName);
     await creator.run();

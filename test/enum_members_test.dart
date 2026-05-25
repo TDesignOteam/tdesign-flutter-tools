@@ -17,7 +17,6 @@ List<ParsedComponentInfoInfo> _analyse(List<String> names, String relPath) {
       col.contextFor(path).currentSession.getParsedUnit(path) as ParsedUnitResult;
   return ComponentRule(
     parsedUnitResult: parsed,
-    isGrammarParser: false,
     nameList: names,
     sourceFileName: relPath.split('/').last,
   ).analyse();

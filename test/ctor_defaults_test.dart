@@ -17,7 +17,6 @@ List<dynamic> _analyse(List<String> names) {
       as ParsedUnitResult;
   final rule = ComponentRule(
     parsedUnitResult: parsed,
-    isGrammarParser: false,
     nameList: names,
     folderName: 'popup',
     sourceFileName: 't_popup_panel.dart',

@@ -1,8 +1,6 @@
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
-import 'package:analyzer/dart/element/element.dart';
-import 'package:analyzer/dart/element/visitor.dart';
 import 'model.dart';
 import 'util.dart';
 
@@ -11,47 +9,32 @@ typedef OnParsedComponentInfoInfo = void Function(ParsedComponentInfoInfo info);
 // ignore_for_file: always_specify_types
 class ComponentRule {
   ComponentRule(
-      {this.isGrammarParser,
-        this.parsedUnitResult,
-        this.resolvedUnitResult,
-        this.startTime,
-        this.nameList,
-        this.basePath,
-        this.folderName,
-        this.sourceFileName});
+      {this.parsedUnitResult,
+      this.startTime,
+      this.nameList,
+      this.basePath,
+      this.folderName,
+      this.sourceFileName});
 
   final ParsedUnitResult? parsedUnitResult; //词法分析
-  final ResolvedUnitResult? resolvedUnitResult; //语法分析
   final List<String>? nameList;
   final String? basePath;
   final String? folderName;
   final String? sourceFileName;
   final int? startTime;
-  final bool? isGrammarParser;
 
   List<ParsedComponentInfoInfo> analyse() {
     List<ParsedComponentInfoInfo> parsedComponentInfoList = [];
     int startTime1 = DateTime.now().microsecondsSinceEpoch;
-    if (isGrammarParser!) {
-      final ComponentVisitor visitor = ComponentVisitor(
-          nameList: nameList,
-          basePath: basePath,
-          onParsedComponentInfoInfo: (ParsedComponentInfoInfo info) {
-            parsedComponentInfoList.add(info);
-          },
-          sourceFileName: sourceFileName);
-      resolvedUnitResult!.libraryElement.accept(visitor);
-    } else {
-      final ComponentAstVisitor visitor = ComponentAstVisitor(
-          nameList: nameList,
-          basePath: basePath,
-          folderName: folderName,
-          onParsedComponentInfoInfo: (ParsedComponentInfoInfo info) {
-            parsedComponentInfoList.add(info);
-          },
-          sourceFileName: sourceFileName);
-      parsedUnitResult!.unit.accept(visitor);
-    }
+    final ComponentAstVisitor visitor = ComponentAstVisitor(
+        nameList: nameList,
+        basePath: basePath,
+        folderName: folderName,
+        onParsedComponentInfoInfo: (ParsedComponentInfoInfo info) {
+          parsedComponentInfoList.add(info);
+        },
+        sourceFileName: sourceFileName);
+    parsedUnitResult!.unit.accept(visitor);
     int endTime = DateTime.now().microsecondsSinceEpoch;
     print('analyse 执行用时: ${((endTime - startTime1) / 1000).floor()}ms');
     print('$sourceFileName 生成完毕');
@@ -521,90 +504,5 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
       // abstract class 的实例方法（含 abstract 方法和带默认实现的可覆写方法）
       componentInfo!.instanceMethodList.add(methodInfo);
     }
-  }
-}
-
-class ComponentVisitor extends RecursiveElementVisitor<void> {
-  ComponentVisitor({this.onParsedComponentInfoInfo, this.nameList, this.basePath, this.folderName, this.sourceFileName});
-
-  final List<String>? nameList;
-  final String? basePath;
-  final String? folderName;
-  final String? sourceFileName;
-  final OnParsedComponentInfoInfo? onParsedComponentInfoInfo;
-
-  @override
-  void visitClassElement(ClassElement element) {
-    element.visitChildren(this);
-    // print('分析文件：$sourceFileName  ${element.displayName}');
-    if (nameList!.contains(element.displayName)) {
-      ComponentInfo componentInfo = parseBaseInfo(element);
-      List<PropertyInfo> propertyList = parseApiInfo(element);
-      if (onParsedComponentInfoInfo != null) {
-        onParsedComponentInfoInfo!(ParsedComponentInfoInfo()
-          ..componentInfo = componentInfo
-          ..propertyList = propertyList
-          ..extraPropertyList = <PropertyInfo>[]
-          ..staticMemberList = <PropertyInfo>[]
-          ..fieldMap = <String, PropertyInfo>{});
-      }
-    }
-  }
-
-  // 解析基本信息
-  ComponentInfo parseBaseInfo(ClassElement element) {
-    ComponentInfo componentInfo = ComponentInfo();
-    componentInfo.name = element.displayName;
-    if (element.documentationComment != null) {
-      componentInfo.introduction = removeDocumentationComment(
-          element.documentationComment!);
-    }
-    return componentInfo;
-  }
-
-  // 解析属性信息
-  List<PropertyInfo> parseApiInfo(ClassElement element) {
-    List<PropertyInfo> propertyList = [];
-    final parameters = element.unnamedConstructor!.parameters;
-    for (final param in parameters) {
-      PropertyInfo item = PropertyInfo();
-      item.name = param.name;
-      item.type = param.type.toString().replaceAll('*', '');
-      item.isRequired = param.hasRequired || param.isRequiredNamed || param.isRequiredPositional;
-      item.isNamed = param.isNamed;
-      String? description = getDescription(param.name, element.fields);
-      if (description != null) {
-        item.introduction = description;
-      } else {
-        item.introduction = fallbackParameterIntroduction(param.name);
-      }
-      if (param.defaultValueCode != null) {
-        item.defaultValue = getDefaultValue(param);
-      }
-      propertyList.add(item);
-    }
-    // 按照属性名称的首字母排序
-    propertyList.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-    
-    return propertyList;
-  }
-
-  String getDefaultValue(ParameterElement param) {
-    String defaultValue = param.defaultValueCode!;
-    if (defaultValue == param.name || defaultValue == 'this.${param.name}') {
-      return '-';
-    }
-    return defaultValue;
-  }
-
-  String? getDescription(String name, List<FieldElement> fields) {
-    final hasField = fields.any((field) => field.name == name);
-    if (hasField) {
-      final field = fields.firstWhere((element) => element.name == name);
-      final hasDocumentation = field.documentationComment != null;
-
-      return hasDocumentation ? removeDocumentationComment(field.documentationComment!) : null;
-    }
-    return null;
   }
 }

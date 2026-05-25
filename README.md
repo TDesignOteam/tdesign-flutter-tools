@@ -79,7 +79,6 @@ dart bin/main.dart generate
     --name                组件名，多个组件名之间用英文,分割
     --folder-name         [可选]生成的组件示例文件夹名称,默认生成的文件夹名称是第一个name参数的下划线表示
     --[no-]only-api       是否只更新api文件
-    --[no-]use-grammar    是否采用语法分析器,默认采用词法分析
 ```
 
 ---
@@ -107,8 +106,6 @@ dart bin/main.dart generate --folder lib/setting --name SettingItemWidget,Settin
 ```
 
 如果想只更新API文档，那么在上述初始化的命令之后增加参数 `--only-api` 即可
-
-默认采用词法分析，如果想采用语法分析的方式生成代码，那么在上述初始化的命令之后增加参数 `--use-grammar` 即可
 
 ### 二、更新组件示例命令
 
