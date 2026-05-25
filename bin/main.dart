@@ -1,6 +1,8 @@
 import 'dart:io';
 
 import 'package:args/command_runner.dart';
+import 'package:path/path.dart' as p;
+import 'package:tdesign_flutter_tools/api_completeness.dart';
 import 'package:tdesign_flutter_tools/model.dart';
 import 'package:tdesign_flutter_tools/smart_create.dart';
 import 'package:tdesign_flutter_tools/smart_update.dart';
@@ -78,6 +80,78 @@ class CreateCommand extends Command {
   }
 }
 
+class ValidateCommand extends Command {
+  @override
+  String name = 'validate';
+
+  @override
+  String description =
+      '校验 API 文档完备性（使用 analyzer AST，与 generate 同一套解析规则）。';
+
+  ValidateCommand() {
+    argParser.addOption(
+      'component-root',
+      help: 'tdesign-component 根目录路径',
+      defaultsTo: '../tdesign-flutter/tdesign-component',
+    );
+    argParser.addOption(
+      'config',
+      help: '审计清单 YAML/JSON 路径',
+      defaultsTo: '.github/config/tdesign_api.yaml',
+    );
+    argParser.addMultiOption(
+      'components',
+      help: '仅检测指定组件，如 button,picker（默认 5 组件全量）',
+    );
+    argParser.addFlag('verbose', abbr: 'v', help: '打印 analyzer 解析过程');
+  }
+
+  @override
+  Future<void> run() async {
+    final String raw = argResults!['component-root'] as String;
+    final String componentRoot = p.isAbsolute(raw)
+        ? p.normalize(raw)
+        : p.normalize(p.join(Directory.current.path, raw));
+    if (!Directory(componentRoot).existsSync()) {
+      stderr.writeln('ERROR: component 目录不存在: $componentRoot');
+      exitCode = 1;
+      return;
+    }
+
+    final String configRaw = argResults!['config'] as String;
+    final String configPath = p.isAbsolute(configRaw)
+        ? p.normalize(configRaw)
+        : p.normalize(p.join(Directory.current.path, configRaw));
+
+    List<ComponentAuditConfig> configs;
+    try {
+      configs = await loadAuditConfigsFromFile(configPath);
+    } catch (e) {
+      stderr.writeln('ERROR: 无法加载配置 $configPath: $e');
+      exitCode = 2;
+      return;
+    }
+
+    final List<String> only =
+        argResults!['components'] as List<String>? ?? <String>[];
+    if (only.isNotEmpty) {
+      final Set<String> wanted = only.toSet();
+      configs = configs
+          .where((ComponentAuditConfig c) => wanted.contains(c.componentKey))
+          .toList();
+    }
+
+    final int errors = await runCompletenessAudit(
+      componentRoot: componentRoot,
+      configs: configs,
+      quiet: !(argResults!['verbose'] as bool? ?? false),
+    );
+    if (errors > 0) {
+      exitCode = 1;
+    }
+  }
+}
+
 class UpdateCommand extends Command {
   @override
   String name = 'update';
@@ -120,6 +194,7 @@ void main(List<String> arguments) {
 
   CommandRunner('tdesign_flutter_tools', 'TDesign Flutter component documentation tools.')
     ..addCommand(CreateCommand())
+    ..addCommand(ValidateCommand())
     ..addCommand(UpdateCommand())
     ..run(arguments);
 }

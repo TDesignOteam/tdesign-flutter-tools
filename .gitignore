@@ -32,6 +32,13 @@
 build/
 .codebuddy/plans
 
+# 本地 dart compile exe 产物（CI 构建 / README 编译命令）
+/api_tool*
+/demo_tool
+/demo_tool_*
+/demo_tool_*.exe
+*.exe
+
 # Android related
 **/android/**/gradle-wrapper.jar
 **/android/.gradle

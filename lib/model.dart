@@ -62,6 +62,24 @@ class ComponentInfo {
   // 其他构造方法信息
   List<StaticMethodInfo> constructorMethodList = [];
 
+  // 实例方法信息（用于 abstract class 的接口方法文档）
+  List<StaticMethodInfo> instanceMethodList = [];
+
+  /// API 条目类型：class | enum | typedef
+  String kind = 'class';
+
+  /// 枚举成员名称（仅 kind == enum）
+  List<String> enumValues = [];
+
+  /// 枚举成员详情（仅 kind == enum）
+  List<EnumMemberInfo> enumMembers = [];
+
+  /// typedef 定义源码（仅 kind == typedef）
+  String typedefDefinition = '';
+
+  /// 解析来源文件（用于 folder 模式下检测跨文件重复定义）
+  String? sourceFile;
+
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
       'name': name,
@@ -134,13 +152,13 @@ class DemoInfo {
   }
 }
 
-class EnumInfo {
-  String? type; // 枚举的类型 例如 TestEnumStyle
-  String? name; // 枚举实例的变量名称，例如代码： TestEnumStyle style; 其中 style 就是 name
-  List<String>? values; //枚举的值，例如 TestEnumStyle 的 values = style1, style2
+//组件属性信息
+/// 枚举成员（名称 + 文档注释）
+class EnumMemberInfo {
+  String name = '';
+  String introduction = '';
 }
 
-//组件属性信息
 class PropertyInfo {
   //属性的名称
   String name = '';
@@ -160,6 +178,9 @@ class PropertyInfo {
   // 默认值
   String defaultValue = '-';
 
+  // 是否为静态成员
+  bool isStatic = false;
+
   @override
   String toString() {
     return '$name | $type | $isRequired | $isNamed | $defaultValue | $introduction';
@@ -168,8 +189,13 @@ class PropertyInfo {
 
 class ParsedComponentInfoInfo {
   ComponentInfo? componentInfo;
+  /// 默认构造方法的形式参数
   late List<PropertyInfo> propertyList;
-  late Map<String,PropertyInfo> fieldMap;
+  /// 未出现在默认构造中、但对外可见的实例字段
+  late List<PropertyInfo> extraPropertyList;
+  /// 静态成员（含 static const 等）
+  late List<PropertyInfo> staticMemberList;
+  late Map<String, PropertyInfo> fieldMap;
 }
 
 // 用户执行的命令
