@@ -255,14 +255,16 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
 
   void _fillPropertyFromFieldMap(PropertyInfo item) {
     final PropertyInfo? field = fieldMap[item.name];
-    if (field == null) {
-      return;
+    if (field != null) {
+      if (item.type.isEmpty && field.type.isNotEmpty) {
+        item.type = field.type;
+      }
+      if (item.introduction.isEmpty && field.introduction.isNotEmpty) {
+        item.introduction = field.introduction;
+      }
     }
-    if (item.type.isEmpty && field.type.isNotEmpty) {
-      item.type = field.type;
-    }
-    if (item.introduction.isEmpty && field.introduction.isNotEmpty) {
-      item.introduction = field.introduction;
+    if (item.introduction.isEmpty) {
+      item.introduction = fallbackParameterIntroduction(item.name);
     }
   }
 
@@ -573,6 +575,8 @@ class ComponentVisitor extends RecursiveElementVisitor<void> {
       String? description = getDescription(param.name, element.fields);
       if (description != null) {
         item.introduction = description;
+      } else {
+        item.introduction = fallbackParameterIntroduction(param.name);
       }
       if (param.defaultValueCode != null) {
         item.defaultValue = getDefaultValue(param);

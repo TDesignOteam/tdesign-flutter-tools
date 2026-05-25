@@ -52,4 +52,18 @@ void main() {
     expect(title, isNotNull);
     expect(title!.type, 'String?');
   });
+
+  test('key gets fallback introduction when source has no comment', () {
+    final list = _analyse(
+      ['TAlertDialog'],
+      'lib/src/components/dialog/t_alert_dialog.dart',
+    );
+    final info = list.first;
+    final key = info.propertyList.firstWhere((PropertyInfo p) => p.name == 'key');
+    final factoryKey = _factoryParam(info, 'vertical', 'key');
+
+    expect(key.introduction, '组件标识，用于区分或保留组件状态。');
+    expect(factoryKey, isNotNull);
+    expect(factoryKey!.introduction, '组件标识，用于区分或保留组件状态。');
+  });
 }

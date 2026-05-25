@@ -122,6 +122,16 @@ String formatMethodParams(List<PropertyInfo> params) {
   return result.isEmpty ? '-' : result;
 }
 
+/// 通用参数说明兜底（仅在源码未提供注释时生效）
+String fallbackParameterIntroduction(String name) {
+  switch (name) {
+    case 'key':
+      return '组件标识，用于区分或保留组件状态。';
+    default:
+      return '';
+  }
+}
+
 /// 检测 folder 模式下跨文件重复的 enum/typedef 定义（源码规范问题，不去重掩盖）
 void reportDuplicateAuxiliaryDefinitions(List<ParsedComponentInfoInfo> items) {
   final Map<String, List<String>> locations = <String, List<String>>{};
