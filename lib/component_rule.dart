@@ -586,16 +586,11 @@ class ComponentVisitor extends RecursiveElementVisitor<void> {
   }
 
   String getDefaultValue(ParameterElement param) {
-    final bool paramIsString =
-        param.type.getDisplayString(withNullability: false) == 'String';
     String defaultValue = param.defaultValueCode!;
     if (defaultValue == param.name || defaultValue == 'this.${param.name}') {
       return '-';
     }
-    if (defaultValue.startsWith("'")) {
-      defaultValue = defaultValue.substring(1, defaultValue.length - 1);
-    }
-    return paramIsString ? defaultValue : defaultValue;
+    return defaultValue;
   }
 
   String? getDescription(String name, List<FieldElement> fields) {

@@ -83,12 +83,6 @@ String formatDefaultValueForDoc(
   if (value == paramName || value == 'this.$paramName') {
     return '-';
   }
-  if ((value.startsWith("'") && value.endsWith("'")) ||
-      (value.startsWith('"') && value.endsWith('"'))) {
-    if (value.length >= 2) {
-      value = value.substring(1, value.length - 1);
-    }
-  }
   return value;
 }
 
