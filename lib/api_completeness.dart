@@ -32,6 +32,7 @@ class ComponentAuditConfig {
 
   final String componentKey;
   final List<String> classNames;
+
   /// 相对 component 根目录，如 lib/src/components/picker
   final String sourceFolder;
   final String folderName;
@@ -48,7 +49,8 @@ Future<List<ComponentAuditConfig>> loadAuditConfigsFromFile(String path) async {
     final dynamic decoded = jsonDecode(content);
     if (decoded is Map<String, dynamic> && decoded['components'] is Map) {
       return _configsFromMap(
-          Map<String, dynamic>.from(decoded['components'] as Map));
+        Map<String, dynamic>.from(decoded['components'] as Map),
+      );
     }
     if (decoded is Map<String, dynamic>) {
       return _configsFromMap(decoded);
@@ -64,8 +66,9 @@ List<ComponentAuditConfig> _configsFromMap(Map<String, dynamic> components) {
     if (entry.value is! Map) {
       throw ArgumentError('组件 ${entry.key} 配置无效');
     }
-    final Map<String, dynamic> map =
-        Map<String, dynamic>.from(entry.value as Map);
+    final Map<String, dynamic> map = Map<String, dynamic>.from(
+      entry.value as Map,
+    );
     final String? folderName = map['folder_name'] as String?;
     final String? sourceFolder = map['source_folder'] as String?;
     final dynamic classesRaw = map['classes'];
@@ -73,7 +76,9 @@ List<ComponentAuditConfig> _configsFromMap(Map<String, dynamic> components) {
         sourceFolder == null ||
         classesRaw is! List ||
         classesRaw.isEmpty) {
-      throw ArgumentError('组件 ${entry.key} 缺少 folder_name / source_folder / classes');
+      throw ArgumentError(
+        '组件 ${entry.key} 缺少 folder_name / source_folder / classes',
+      );
     }
     configs.add(
       ComponentAuditConfig(
@@ -101,8 +106,7 @@ List<ComponentAuditConfig> _configsFromYaml(String yaml) {
       continue;
     }
 
-    final RegExpMatch? componentMatch =
-        RegExp(r'^(\w+):$').firstMatch(trimmed);
+    final RegExpMatch? componentMatch = RegExp(r'^(\w+):$').firstMatch(trimmed);
     if (rawLine.startsWith('  ') &&
         !rawLine.startsWith('    ') &&
         componentMatch != null) {
@@ -118,14 +122,16 @@ List<ComponentAuditConfig> _configsFromYaml(String yaml) {
 
     if (trimmed.startsWith('- ')) {
       if (listKey == 'classes') {
-        (components[currentKey]!['classes'] as List<String>)
-            .add(trimmed.substring(2).trim());
+        (components[currentKey]!['classes'] as List<String>).add(
+          trimmed.substring(2).trim(),
+        );
       }
       continue;
     }
 
-    final RegExpMatch? kvMatch =
-        RegExp(r'^(\w+):(?:\s*(.+))?$').firstMatch(trimmed);
+    final RegExpMatch? kvMatch = RegExp(
+      r'^(\w+):(?:\s*(.+))?$',
+    ).firstMatch(trimmed);
     if (kvMatch == null) {
       continue;
     }
@@ -175,8 +181,11 @@ Set<String> markdownDefaultCtorParamNames(String section) {
     if (!line.startsWith('|') || line.startsWith('| ---')) {
       continue;
     }
-    final List<String> cols =
-        line.trim().replaceFirst('|', '').replaceFirst(RegExp(r'\|$'), '').split('|');
+    final List<String> cols = line
+        .trim()
+        .replaceFirst('|', '')
+        .replaceFirst(RegExp(r'\|$'), '')
+        .split('|');
     if (cols.isEmpty) {
       continue;
     }
@@ -202,8 +211,11 @@ List<String> markdownCtorParamsWithEmptyType(String section) {
     if (!line.startsWith('|') || line.startsWith('| ---')) {
       continue;
     }
-    final List<String> cols =
-        line.trim().replaceFirst('|', '').replaceFirst(RegExp(r'\|$'), '').split('|');
+    final List<String> cols = line
+        .trim()
+        .replaceFirst('|', '')
+        .replaceFirst(RegExp(r'\|$'), '')
+        .split('|');
     if (cols.length < 2) {
       continue;
     }
@@ -252,8 +264,49 @@ List<CompletenessIssue> duplicateAuxiliaryIssues(
         component: componentKey,
         level: 'ERROR',
         category: 'source',
-        message:
-            '源码重复定义 $kindLabel `$typeName`: ${uniqueFiles.join(', ')}',
+        message: '源码重复定义 $kindLabel `$typeName`: ${uniqueFiles.join(', ')}',
+      ),
+    );
+  }
+  return issues;
+}
+
+/// enum 成员缺少源码注释（返回 issue，不打印）
+List<CompletenessIssue> enumMemberIntroductionIssues(
+  String componentKey,
+  List<ParsedComponentInfoInfo> parsed,
+) {
+  final List<CompletenessIssue> issues = <CompletenessIssue>[];
+  for (final ParsedComponentInfoInfo item in parsed) {
+    final ComponentInfo? componentInfo = item.componentInfo;
+    if (componentInfo?.kind != 'enum') {
+      continue;
+    }
+    if (componentInfo?.isSimpleEnum ?? false) {
+      continue;
+    }
+    final String enumName = componentInfo?.name ?? '';
+    if (enumName.isEmpty) {
+      continue;
+    }
+    final List<String> missingMembers =
+        componentInfo!.enumMembers
+            .where(
+              (EnumMemberInfo member) =>
+                  member.name.isNotEmpty && member.introduction.trim().isEmpty,
+            )
+            .map((EnumMemberInfo member) => member.name)
+            .toList()
+          ..sort();
+    if (missingMembers.isEmpty) {
+      continue;
+    }
+    issues.add(
+      CompletenessIssue(
+        component: componentKey,
+        level: 'WARN',
+        category: 'source',
+        message: 'enum $enumName 的枚举成员缺少说明，请在源码中补充 /// 注释: $missingMembers',
       ),
     );
   }
@@ -268,8 +321,10 @@ Future<List<CompletenessIssue>> auditComponent({
 }) async {
   final List<CompletenessIssue> issues = <CompletenessIssue>[];
   final String root = p.normalize(componentRoot);
-  final String apiPath =
-      p.join(root, 'example/assets/api/${config.folderName}_api.md');
+  final String apiPath = p.join(
+    root,
+    'example/assets/api/${config.folderName}_api.md',
+  );
   final File apiFile = File(apiPath);
 
   if (!apiFile.existsSync()) {
@@ -284,12 +339,14 @@ Future<List<CompletenessIssue>> auditComponent({
     return issues;
   }
 
-  final Map<String, String> sections =
-      parseMarkdownSections(await apiFile.readAsString());
+  final Map<String, String> sections = parseMarkdownSections(
+    await apiFile.readAsString(),
+  );
 
-  final String basePath = root.endsWith(Platform.pathSeparator)
-      ? root
-      : '$root${Platform.pathSeparator}';
+  final String basePath =
+      root.endsWith(Platform.pathSeparator)
+          ? root
+          : '$root${Platform.pathSeparator}';
 
   final List<ParsedComponentInfoInfo> parsed = await SmartCreator(
     isFileMode: false,
@@ -303,11 +360,12 @@ Future<List<CompletenessIssue>> auditComponent({
 
   final Map<String, ParsedComponentInfoInfo> parsedByName =
       <String, ParsedComponentInfoInfo>{
-    for (final ParsedComponentInfoInfo item in parsed)
-      if (item.componentInfo?.name != null) item.componentInfo!.name!: item,
-  };
+        for (final ParsedComponentInfoInfo item in parsed)
+          if (item.componentInfo?.name != null) item.componentInfo!.name!: item,
+      };
 
   issues.addAll(duplicateAuxiliaryIssues(config.componentKey, parsed));
+  issues.addAll(enumMemberIntroductionIssues(config.componentKey, parsed));
 
   for (final String className in config.classNames) {
     if (!sections.containsKey(className)) {
@@ -379,63 +437,64 @@ Future<List<CompletenessIssue>> auditComponent({
       continue;
     }
 
-  final Set<String> srcCtorParams =
-      info.propertyList.map((PropertyInfo e) => e.name).where((n) => n.isNotEmpty).toSet();
-  final bool hasInstanceMethods =
-      info.componentInfo?.instanceMethodList.isNotEmpty ?? false;
+    final Set<String> srcCtorParams =
+        info.propertyList
+            .map((PropertyInfo e) => e.name)
+            .where((n) => n.isNotEmpty)
+            .toSet();
+    final bool hasInstanceMethods =
+        info.componentInfo?.instanceMethodList.isNotEmpty ?? false;
 
-  if (srcCtorParams.isEmpty) {
-    if (hasInstanceMethods) {
+    if (srcCtorParams.isEmpty) {
+      if (hasInstanceMethods) {
+        issues.add(
+          CompletenessIssue(
+            component: config.componentKey,
+            level: 'INFO',
+            category: 'source',
+            message: '$className 无默认构造参数（如 abstract class），跳过构造参数对比',
+          ),
+        );
+      }
+      continue;
+    }
+
+    final Set<String> docCtorParams = markdownDefaultCtorParamNames(section);
+    final Set<String> missingInDoc = srcCtorParams.difference(docCtorParams);
+    final Set<String> extraInDoc = docCtorParams.difference(srcCtorParams);
+
+    if (missingInDoc.isNotEmpty) {
       issues.add(
         CompletenessIssue(
           component: config.componentKey,
-          level: 'INFO',
-          category: 'source',
-          message: '$className 无默认构造参数（如 abstract class），跳过构造参数对比',
+          level: 'ERROR',
+          category: 'tool',
+          message: '$className 文档缺少构造参数: ${missingInDoc.toList()..sort()}',
         ),
       );
     }
-    continue;
-  }
+    if (extraInDoc.isNotEmpty) {
+      issues.add(
+        CompletenessIssue(
+          component: config.componentKey,
+          level: 'WARN',
+          category: 'tool',
+          message: '$className 文档多出非构造参数: ${extraInDoc.toList()..sort()}',
+        ),
+      );
+    }
 
-  final Set<String> docCtorParams = markdownDefaultCtorParamNames(section);
-  final Set<String> missingInDoc = srcCtorParams.difference(docCtorParams);
-  final Set<String> extraInDoc = docCtorParams.difference(srcCtorParams);
-
-  if (missingInDoc.isNotEmpty) {
-    issues.add(
-      CompletenessIssue(
-        component: config.componentKey,
-        level: 'ERROR',
-        category: 'tool',
-        message:
-            '$className 文档缺少构造参数: ${missingInDoc.toList()..sort()}',
-      ),
-    );
-  }
-  if (extraInDoc.isNotEmpty) {
-    issues.add(
-      CompletenessIssue(
-        component: config.componentKey,
-        level: 'WARN',
-        category: 'tool',
-        message:
-            '$className 文档多出非构造参数: ${extraInDoc.toList()..sort()}',
-      ),
-    );
-  }
-
-  final List<String> emptyTypes = markdownCtorParamsWithEmptyType(section);
-  if (emptyTypes.isNotEmpty) {
-    issues.add(
-      CompletenessIssue(
-        component: config.componentKey,
-        level: 'WARN',
-        category: 'tool',
-        message: '$className 构造参数类型未解析(-): $emptyTypes',
-      ),
-    );
-  }
+    final List<String> emptyTypes = markdownCtorParamsWithEmptyType(section);
+    if (emptyTypes.isNotEmpty) {
+      issues.add(
+        CompletenessIssue(
+          component: config.componentKey,
+          level: 'WARN',
+          category: 'tool',
+          message: '$className 构造参数类型未解析(-): $emptyTypes',
+        ),
+      );
+    }
   }
 
   if (issues.where((CompletenessIssue i) => i.category != 'ok').isEmpty) {
@@ -458,7 +517,8 @@ Future<int> runCompletenessAudit({
   List<ComponentAuditConfig>? configs,
   bool quiet = true,
 }) async {
-  final List<ComponentAuditConfig> auditConfigs = configs ??
+  final List<ComponentAuditConfig> auditConfigs =
+      configs ??
       await loadAuditConfigsFromFile(
         p.join(Directory.current.path, defaultAuditConfigPath()),
       );
@@ -475,8 +535,10 @@ Future<int> runCompletenessAudit({
       config: config,
       quiet: quiet,
     );
-    final String apiPath =
-        p.join(componentRoot, 'example/assets/api/${config.folderName}_api.md');
+    final String apiPath = p.join(
+      componentRoot,
+      'example/assets/api/${config.folderName}_api.md',
+    );
     Map<String, String> sections = <String, String>{};
     if (File(apiPath).existsSync()) {
       sections = parseMarkdownSections(await File(apiPath).readAsString());
@@ -487,8 +549,7 @@ Future<int> runCompletenessAudit({
       '   文档条目 (${sections.length}): ${sections.keys.take(8).join(', ')}${sections.length > 8 ? '...' : ''}',
     );
 
-    final bool hasOk =
-        issues.any((CompletenessIssue i) => i.category == 'ok');
+    final bool hasOk = issues.any((CompletenessIssue i) => i.category == 'ok');
     if (hasOk) {
       stdout.writeln('   ✅ 未发现完备性问题');
     }

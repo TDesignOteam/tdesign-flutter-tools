@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
@@ -30,9 +32,31 @@ class ComponentRule {
   final int? startTime;
   final bool? isGrammarParser;
 
+  Set<String> _loadSimpleEnumNames() {
+    final String? path = parsedUnitResult?.path ?? resolvedUnitResult?.path;
+    if (path == null || path.isEmpty) {
+      return <String>{};
+    }
+    final File file = File(path);
+    if (!file.existsSync()) {
+      return <String>{};
+    }
+    final String content = file.readAsStringSync();
+    final RegExp marker = RegExp(
+      r'^[ \t]*//[ \t]*doc-simple-enum[ \t]*\r?\n(?:(?:[ \t]*///.*\r?\n)|(?:[ \t]*@.*\r?\n)|(?:[ \t]*\r?\n))*[ \t]*enum[ \t]+([A-Za-z_]\w*)',
+      multiLine: true,
+    );
+    return marker
+        .allMatches(content)
+        .map((Match match) => match.group(1) ?? '')
+        .where((String name) => name.isNotEmpty)
+        .toSet();
+  }
+
   List<ParsedComponentInfoInfo> analyse() {
     List<ParsedComponentInfoInfo> parsedComponentInfoList = [];
     int startTime1 = DateTime.now().microsecondsSinceEpoch;
+    final Set<String> simpleEnumNames = _loadSimpleEnumNames();
     if (isGrammarParser!) {
       final ComponentVisitor visitor = ComponentVisitor(
         nameList: nameList,
@@ -48,6 +72,7 @@ class ComponentRule {
         nameList: nameList,
         basePath: basePath,
         folderName: folderName,
+        simpleEnumNames: simpleEnumNames,
         onParsedComponentInfoInfo: (ParsedComponentInfoInfo info) {
           parsedComponentInfoList.add(info);
         },
@@ -69,12 +94,14 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
     this.basePath,
     this.folderName,
     this.sourceFileName,
+    this.simpleEnumNames = const <String>{},
   });
 
   final List<String>? nameList;
   final String? basePath;
   final String? folderName;
   final String? sourceFileName;
+  final Set<String> simpleEnumNames;
   final OnParsedComponentInfoInfo? onParsedComponentInfoInfo;
   ComponentInfo? componentInfo;
   List<PropertyInfo> propertyList = [];
@@ -125,7 +152,8 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
     final ComponentInfo componentInfo =
         ComponentInfo()
           ..name = name
-          ..kind = 'enum';
+          ..kind = 'enum'
+          ..isSimpleEnum = simpleEnumNames.contains(name);
     if (node.documentationComment != null) {
       componentInfo.introduction = removeDocumentationComment(
         node.documentationComment!.tokens.join('\n'),

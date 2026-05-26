@@ -368,25 +368,44 @@ class SmartCreator {
         }
         final List<EnumMemberInfo> enumMembers =
             apiInfo.componentInfo!.enumMembers;
+        final bool isSimpleEnum = apiInfo.componentInfo!.isSimpleEnum;
         if (enumMembers.isNotEmpty) {
           sb.write('\n#### 枚举值\n');
-          sb.write('''\n
+          if (isSimpleEnum) {
+            sb.write('''\n
+| 名称 |
+| --- |\n''');
+            for (final EnumMemberInfo member in enumMembers) {
+              sb.write('| ${sanitizeTableCell(member.name)} |\n');
+            }
+          } else {
+            sb.write('''\n
 | 名称 | 说明 |
 | --- | --- |\n''');
-          for (final EnumMemberInfo member in enumMembers) {
-            final String doc =
-                member.introduction.isEmpty ? '-' : member.introduction;
-            sb.write(
-              '| ${sanitizeTableCell(member.name)} | ${sanitizeTableCell(doc)} |\n',
-            );
+            for (final EnumMemberInfo member in enumMembers) {
+              final String doc =
+                  member.introduction.isEmpty ? '-' : member.introduction;
+              sb.write(
+                '| ${sanitizeTableCell(member.name)} | ${sanitizeTableCell(doc)} |\n',
+              );
+            }
           }
         } else if (apiInfo.componentInfo!.enumValues.isNotEmpty) {
           sb.write('\n#### 枚举值\n');
-          sb.write('''\n
+          if (isSimpleEnum) {
+            sb.write('''\n
+| 名称 |
+| --- |\n''');
+            for (final String value in apiInfo.componentInfo!.enumValues) {
+              sb.write('| ${sanitizeTableCell(value)} |\n');
+            }
+          } else {
+            sb.write('''\n
 | 名称 | 说明 |
 | --- | --- |\n''');
-          for (final String value in apiInfo.componentInfo!.enumValues) {
-            sb.write('| ${sanitizeTableCell(value)} | - |\n');
+            for (final String value in apiInfo.componentInfo!.enumValues) {
+              sb.write('| ${sanitizeTableCell(value)} | - |\n');
+            }
           }
         }
         continue;
