@@ -63,7 +63,7 @@ class SmartCreator {
         print(pen('输入的文件夹路径不对: $fullPath'));
       }
     }
-  int startTime = DateTime.now().microsecondsSinceEpoch;
+    int startTime = DateTime.now().microsecondsSinceEpoch;
     // print('${DateTime.now().toLocal()}  AnalysisContextCollection');]
     var sb = StringBuffer();
     files.forEach((element) {
@@ -76,22 +76,27 @@ class SmartCreator {
       print(pen('Detected Dart SDK: $sdkPath'));
     } else {
       AnsiPen pen = AnsiPen()..yellow(bold: true);
-      print(pen('Warning: Could not auto-detect Dart SDK. Analyzer may fail in compiled binary.'));
+      print(
+        pen(
+          'Warning: Could not auto-detect Dart SDK. Analyzer may fail in compiled binary.',
+        ),
+      );
     }
 
     // If sdkPath is not found, omit sdkPath and let the analyzer attempt default discovery (may fail for compiled exe).
-    AnalysisContextCollection analysisContextCollection = (sdkPath != null && sdkPath.isNotEmpty)
-        ? AnalysisContextCollection(
-            includedPaths: files,
-            excludedPaths: [],
-            resourceProvider: PhysicalResourceProvider.INSTANCE,
-            sdkPath: sdkPath,
-          )
-        : AnalysisContextCollection(
-            includedPaths: files,
-            excludedPaths: [],
-            resourceProvider: PhysicalResourceProvider.INSTANCE,
-          );
+    AnalysisContextCollection analysisContextCollection =
+        (sdkPath != null && sdkPath.isNotEmpty)
+            ? AnalysisContextCollection(
+              includedPaths: files,
+              excludedPaths: [],
+              resourceProvider: PhysicalResourceProvider.INSTANCE,
+              sdkPath: sdkPath,
+            )
+            : AnalysisContextCollection(
+              includedPaths: files,
+              excludedPaths: [],
+              resourceProvider: PhysicalResourceProvider.INSTANCE,
+            );
     return analyseFile(analysisContextCollection, files, startTime);
   }
 
@@ -113,18 +118,22 @@ class SmartCreator {
     final AnalysisContextCollection analysisContextCollection =
         (sdkPath != null && sdkPath.isNotEmpty)
             ? AnalysisContextCollection(
-                includedPaths: files,
-                excludedPaths: [],
-                resourceProvider: PhysicalResourceProvider.INSTANCE,
-                sdkPath: sdkPath,
-              )
+              includedPaths: files,
+              excludedPaths: [],
+              resourceProvider: PhysicalResourceProvider.INSTANCE,
+              sdkPath: sdkPath,
+            )
             : AnalysisContextCollection(
-                includedPaths: files,
-                excludedPaths: [],
-                resourceProvider: PhysicalResourceProvider.INSTANCE,
-              );
-    return _parseComponents(analysisContextCollection, files, startTime,
-        quiet: quiet);
+              includedPaths: files,
+              excludedPaths: [],
+              resourceProvider: PhysicalResourceProvider.INSTANCE,
+            );
+    return _parseComponents(
+      analysisContextCollection,
+      files,
+      startTime,
+      quiet: quiet,
+    );
   }
 
   List<String> _collectSourceFiles() {
@@ -162,9 +171,13 @@ class SmartCreator {
     }
 
     // 2) flutter env
-    final flutterRoot = Platform.environment['FLUTTER_ROOT'] ?? Platform.environment['FLUTTER_HOME'];
+    final flutterRoot =
+        Platform.environment['FLUTTER_ROOT'] ??
+        Platform.environment['FLUTTER_HOME'];
     if (flutterRoot != null && flutterRoot.isNotEmpty) {
-      final candidate = normalize(join(flutterRoot, 'bin', 'cache', 'dart-sdk'));
+      final candidate = normalize(
+        join(flutterRoot, 'bin', 'cache', 'dart-sdk'),
+      );
       if (Directory(candidate).existsSync()) return candidate;
     }
 
@@ -180,7 +193,9 @@ class SmartCreator {
             final binDir = dirname(dartExe);
             final parent = dirname(binDir);
             // check for flutter cached sdk
-            final flutterCache = normalize(join(parent, 'bin', 'cache', 'dart-sdk'));
+            final flutterCache = normalize(
+              join(parent, 'bin', 'cache', 'dart-sdk'),
+            );
             if (Directory(flutterCache).existsSync()) return flutterCache;
             // check for lib/_internal
             final internal = normalize(join(parent, 'lib', '_internal'));
@@ -266,7 +281,8 @@ class SmartCreator {
       if (!quiet) {
         final int endTime = DateTime.now().microsecondsSinceEpoch;
         print(
-            '${isGrammarParser! ? "语法分析" : "词法分析"}执行用时: ${((endTime - startTime) / 1000).floor()}ms');
+          '${isGrammarParser! ? "语法分析" : "词法分析"}执行用时: ${((endTime - startTime) / 1000).floor()}ms',
+        );
       }
       parsedComponentInfoList.addAll(issuesInFile.analyse());
     }
@@ -283,8 +299,10 @@ class SmartCreator {
       }
     }
 
-    parsedComponentInfoList.sort((ParsedComponentInfoInfo a,
-            ParsedComponentInfoInfo b) {
+    parsedComponentInfoList.sort((
+      ParsedComponentInfoInfo a,
+      ParsedComponentInfoInfo b,
+    ) {
       final int kindCmp = kindOrder(a).compareTo(kindOrder(b));
       if (kindCmp != 0) {
         return kindCmp;
@@ -298,12 +316,19 @@ class SmartCreator {
     return parsedComponentInfoList;
   }
 
-  Future<void> analyseFile(AnalysisContextCollection analysisContextCollection, List<String> paths, int startTime) async {
+  Future<void> analyseFile(
+    AnalysisContextCollection analysisContextCollection,
+    List<String> paths,
+    int startTime,
+  ) async {
     final List<ParsedComponentInfoInfo> parsedComponentInfoList =
         await _parseComponents(analysisContextCollection, paths, startTime);
     await generateApiInfoFile(parsedComponentInfoList);
     if (!onlyApi! && parsedComponentInfoList.isNotEmpty) {
-      await generateBaseInfoFile(parsedComponentInfoList.first.componentInfo!, commandInfo!);
+      await generateBaseInfoFile(
+        parsedComponentInfoList.first.componentInfo!,
+        commandInfo!,
+      );
       await generateDemoFile(parsedComponentInfoList.first.componentInfo);
       await copyCoverFile(parsedComponentInfoList.first.componentInfo);
     }
@@ -312,7 +337,9 @@ class SmartCreator {
   }
 
   // 生成 api 信息文件
-  Future<void> generateApiInfoFile(List<ParsedComponentInfoInfo> parsedComponentInfoList) async {
+  Future<void> generateApiInfoFile(
+    List<ParsedComponentInfoInfo> parsedComponentInfoList,
+  ) async {
     int startTime = DateTime.now().microsecondsSinceEpoch;
     String? destName = CamelToUnderline(nameList!.first);
     if (folderName != null && folderName!.isNotEmpty) {
@@ -350,7 +377,8 @@ class SmartCreator {
             final String doc =
                 member.introduction.isEmpty ? '-' : member.introduction;
             sb.write(
-                '| ${sanitizeTableCell(member.name)} | ${sanitizeTableCell(doc)} |\n');
+              '| ${sanitizeTableCell(member.name)} | ${sanitizeTableCell(doc)} |\n',
+            );
           }
         } else if (apiInfo.componentInfo!.enumValues.isNotEmpty) {
           sb.write('\n#### 枚举值\n');
@@ -371,13 +399,16 @@ class SmartCreator {
         }
         if (apiInfo.componentInfo!.typedefDefinition.isNotEmpty) {
           sb.write('\n#### 类型定义\n\n');
-          sb.write('```dart\n${apiInfo.componentInfo!.typedefDefinition}\n```\n');
+          sb.write(
+            '```dart\n${apiInfo.componentInfo!.typedefDefinition}\n```\n',
+          );
         }
         continue;
       }
 
       // 无任何可渲染内容（如 sealed 基类）或有实例方法（如 abstract class），都强制显示简介
-      final hasNoContent = apiInfo.propertyList.isEmpty &&
+      final hasNoContent =
+          apiInfo.propertyList.isEmpty &&
           apiInfo.extraPropertyList.isEmpty &&
           apiInfo.staticMemberList.isEmpty &&
           (apiInfo.componentInfo?.constructorMethodList.isEmpty ?? true) &&
@@ -392,6 +423,8 @@ class SmartCreator {
         sb.write('\n#### 简介\n');
         sb.write(introduction);
       }
+      StaticMethodInfo? currentMethod;
+
       void writePropertyTable(
         List<PropertyInfo> items, {
         required String header,
@@ -406,8 +439,116 @@ class SmartCreator {
 | --- | --- | --- | --- |\n''');
         for (final PropertyInfo item in items) {
           sb.write(
-              '''| ${sanitizeTableCell(item.name)} | ${sanitizeTableCell(item.type.isEmpty ? '-' : item.type)} | ${sanitizeTableCell(item.defaultValue)} | ${sanitizeTableCell(item.introduction)} |\n''');
+            '''| ${sanitizeTableCell(item.name)} | ${sanitizeTableCell(item.type.isEmpty ? '-' : item.type)} | ${sanitizeTableCell(item.defaultValue)} | ${sanitizeTableCell(item.introduction)} |\n''',
+          );
         }
+      }
+
+      PropertyInfo? resolveForwardedParamInfo(
+        StaticMethodInfo method,
+        PropertyInfo param,
+      ) {
+        final String? targetName = method.forwardedTargetName;
+        final String? targetParamName = method.forwardedParamMap[param.name];
+        if (targetName == null ||
+            targetName.isEmpty ||
+            targetParamName == null ||
+            targetParamName.isEmpty) {
+          return null;
+        }
+        ParsedComponentInfoInfo? targetInfo;
+        for (final ParsedComponentInfoInfo item in parsedComponentInfoList) {
+          if (item.componentInfo?.kind == 'class' &&
+              item.componentInfo?.name == targetName) {
+            targetInfo = item;
+            break;
+          }
+        }
+        if (targetInfo == null) {
+          return null;
+        }
+        final String? constructorName = method.forwardedConstructorName;
+        if (constructorName != null && constructorName.isNotEmpty) {
+          for (final StaticMethodInfo ctor
+              in targetInfo.componentInfo!.constructorMethodList) {
+            if (ctor.name != constructorName) {
+              continue;
+            }
+            for (final PropertyInfo item in ctor.params) {
+              if (item.name == targetParamName) {
+                return item;
+              }
+            }
+            return null;
+          }
+          return null;
+        }
+        for (final PropertyInfo item in targetInfo.propertyList) {
+          if (item.name == targetParamName) {
+            return item;
+          }
+        }
+        return targetInfo.fieldMap[targetParamName];
+      }
+
+      void writeMethodParamTable(List<PropertyInfo> params) {
+        if (params.isEmpty) {
+          return;
+        }
+        sb.write('''\n
+| 参数 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |\n''');
+        for (final PropertyInfo param in params) {
+          PropertyInfo? forwardedParam;
+          if (currentMethod != null) {
+            forwardedParam = resolveForwardedParamInfo(currentMethod!, param);
+          }
+          final String type =
+              ((param.type.isEmpty || param.type == '-') &&
+                      forwardedParam != null &&
+                      forwardedParam.type.isNotEmpty &&
+                      forwardedParam.type != '-')
+                  ? forwardedParam.type
+                  : param.type;
+          final String introduction =
+              param.introduction.isEmpty && forwardedParam != null
+                  ? forwardedParam.introduction
+                  : param.introduction;
+          sb.write(
+            '''| ${sanitizeTableCell(param.name)} | ${sanitizeTableCell(type.isEmpty ? '-' : type)} | ${sanitizeTableCell(param.defaultValue)} | ${sanitizeTableCell(introduction)} |\n''',
+          );
+        }
+      }
+
+      void writeMethodDetails(
+        List<StaticMethodInfo> methods, {
+        required String header,
+        bool includeReturnType = false,
+      }) {
+        if (methods.isEmpty) {
+          return;
+        }
+        sb.write('\n\n#### $header');
+        methods.sort(
+          (StaticMethodInfo a, StaticMethodInfo b) =>
+              a.name!.toLowerCase().compareTo(b.name!.toLowerCase()),
+        );
+        for (final StaticMethodInfo item in methods) {
+          currentMethod = item;
+          sb.write(
+            '\n\n##### ${apiInfo.componentInfo!.name}.${sanitizeTableCell(item.name)}',
+          );
+          if (item.introduction != null && item.introduction!.isNotEmpty) {
+            sb.write('\n\n${item.introduction}');
+          }
+          final String returnType =
+              item.returnType == 'null' ? '' : (item.returnType ?? '');
+          if (includeReturnType && returnType.isNotEmpty) {
+            sb.write('\n\n返回类型：`$returnType`');
+          }
+          writeMethodParamTable(item.params);
+        }
+        currentMethod = null;
       }
 
       if (apiInfo.propertyList.isNotEmpty) {
@@ -426,48 +567,30 @@ class SmartCreator {
         }
         writePropertyTable(apiInfo.propertyList, header: '默认构造方法');
       }
-      writePropertyTable(apiInfo.extraPropertyList,
-          header: '公开属性', nameColumn: '属性');
-      writePropertyTable(apiInfo.staticMemberList,
-          header: '静态成员', nameColumn: '名称');
+      writePropertyTable(
+        apiInfo.extraPropertyList,
+        header: '公开属性',
+        nameColumn: '属性',
+      );
+      writePropertyTable(
+        apiInfo.staticMemberList,
+        header: '静态成员',
+        nameColumn: '名称',
+      );
       if (apiInfo.componentInfo?.constructorMethodList.isNotEmpty ?? false) {
-        sb.write('\n\n');
-        sb.write('#### 工厂构造方法');
-        apiInfo.componentInfo!.constructorMethodList.sort((StaticMethodInfo a,
-                StaticMethodInfo b) =>
-            a.name!.toLowerCase().compareTo(b.name!.toLowerCase()));
-        for (final StaticMethodInfo item
-            in apiInfo.componentInfo!.constructorMethodList) {
-          sb.write(
-              '\n\n##### ${apiInfo.componentInfo!.name}.${sanitizeTableCell(item.name)}');
-          if (item.introduction != null && item.introduction!.isNotEmpty) {
-            sb.write('\n\n${item.introduction}');
-          }
-          if (item.params.isNotEmpty) {
-            sb.write('''\n
-| 参数 | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- |\n''');
-            for (final PropertyInfo param in item.params) {
-              sb.write(
-                  '''| ${sanitizeTableCell(param.name)} | ${sanitizeTableCell(param.type.isEmpty ? '-' : param.type)} | ${sanitizeTableCell(param.defaultValue)} | ${sanitizeTableCell(param.introduction)} |\n''');
-            }
-          }
-        }
+        writeMethodDetails(
+          apiInfo.componentInfo!.constructorMethodList,
+          header: '工厂构造方法',
+        );
       }
-      if(apiInfo.componentInfo?.staticMethodList.isNotEmpty ?? false){
-        sb.write("\n\n");
-        sb.write("#### 静态方法");
-        sb.write('''\n
-| 名称 | 返回类型 | 参数 | 说明 |
-| --- | --- | --- | --- |\n''');
-        // 按照方法名称的首字母排序
-        apiInfo.componentInfo!.staticMethodList.sort((a, b) => a.name!.toLowerCase().compareTo(b.name!.toLowerCase()));
-        for (final item in apiInfo.componentInfo!.staticMethodList) {
-          sb.write(
-              '''| ${sanitizeTableCell(item.name)} | ${sanitizeTableCell(item.returnType == "null" ? "" : item.returnType)} | ${sanitizeTableCell(formatMethodParams(item.params))} | ${sanitizeTableCell(item.introduction)} |\n''');
-        }
+      if (apiInfo.componentInfo?.staticMethodList.isNotEmpty ?? false) {
+        writeMethodDetails(
+          apiInfo.componentInfo!.staticMethodList,
+          header: '静态方法',
+          includeReturnType: true,
+        );
       }
-      if(apiInfo.componentInfo?.instanceMethodList.isNotEmpty ?? false){
+      if (apiInfo.componentInfo?.instanceMethodList.isNotEmpty ?? false) {
         sb.write("\n\n");
         sb.write("#### 方法");
         sb.write('''\n
@@ -477,18 +600,26 @@ class SmartCreator {
           final returnType =
               item.returnType == "null" ? "" : (item.returnType ?? "");
           sb.write(
-              '| ${sanitizeTableCell(item.name)} | ${sanitizeTableCell(returnType)} | ${sanitizeTableCell(formatMethodParams(item.params))} | ${sanitizeTableCell(item.introduction)} |\n');
+            '| ${sanitizeTableCell(item.name)} | ${sanitizeTableCell(returnType)} | ${sanitizeTableCell(formatMethodParams(item.params))} | ${sanitizeTableCell(item.introduction)} |\n',
+          );
         }
       }
     }
     await file.writeAsString(sb.toString(), encoding: utf8);
     int endTime = DateTime.now().microsecondsSinceEpoch;
     AnsiPen pen = AnsiPen()..green(bold: true);
-    print(pen('$relativePath 生成完毕!  用时: ${((endTime - startTime) / 1000).floor()}ms'));
+    print(
+      pen(
+        '$relativePath 生成完毕!  用时: ${((endTime - startTime) / 1000).floor()}ms',
+      ),
+    );
   }
 
   // 生成基本信息文件
-  Future<void> generateBaseInfoFile(ComponentInfo componentInfo, CommandInfo commandInfo) async {
+  Future<void> generateBaseInfoFile(
+    ComponentInfo componentInfo,
+    CommandInfo commandInfo,
+  ) async {
     int startTime = DateTime.now().microsecondsSinceEpoch;
     String? destName = getDestFolderName(componentInfo);
     String relativePath = getWidgetDirPath(destName);
@@ -531,9 +662,12 @@ ${componentInfo.introduction}
     await file.writeAsString(fileContent, encoding: utf8);
     int endTime = DateTime.now().microsecondsSinceEpoch;
     AnsiPen pen = AnsiPen()..green(bold: true);
-    print(pen('${join(relativePath, '$destName.md')} 生成完毕!  用时: ${((endTime - startTime) / 1000).floor()}ms'));
+    print(
+      pen(
+        '${join(relativePath, '$destName.md')} 生成完毕!  用时: ${((endTime - startTime) / 1000).floor()}ms',
+      ),
+    );
   }
-
 
   // 生成 demo 示例文件
   Future<void> generateDemoFile(ComponentInfo? componentInfo) async {
@@ -564,7 +698,11 @@ class ${componentInfo!.name}Demo1 extends StatelessWidget {
       await file.writeAsString(fileContent, encoding: utf8);
       int endTime = DateTime.now().microsecondsSinceEpoch;
       AnsiPen pen = AnsiPen()..green(bold: true);
-      print(pen('${join(relativePath, 'demo1.dart')} 生成完毕!  用时: ${((endTime - startTime) / 1000).floor()}ms'));
+      print(
+        pen(
+          '${join(relativePath, 'demo1.dart')} 生成完毕!  用时: ${((endTime - startTime) / 1000).floor()}ms',
+        ),
+      );
     }
   }
 
@@ -596,9 +734,11 @@ class ${componentInfo!.name}Demo1 extends StatelessWidget {
     return destName;
   }
 
-// 指定目标地址
-  String getRelativePath(String? destName) => '${output ?? 'example/assets/api/'}${destName}_api.md';
+  // 指定目标地址
+  String getRelativePath(String? destName) =>
+      '${output ?? 'example/assets/api/'}${destName}_api.md';
 
-// 指定widget生成地址
-  String getWidgetDirPath(String? destName) => '${output ?? 'example/lib/api/widget_group/'}$destName';
+  // 指定widget生成地址
+  String getWidgetDirPath(String? destName) =>
+      '${output ?? 'example/lib/api/widget_group/'}$destName';
 }
