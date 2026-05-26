@@ -282,6 +282,9 @@ List<CompletenessIssue> enumMemberIntroductionIssues(
     if (componentInfo?.kind != 'enum') {
       continue;
     }
+    if (componentInfo?.isSimpleEnum ?? false) {
+      continue;
+    }
     final String enumName = componentInfo?.name ?? '';
     if (enumName.isEmpty) {
       continue;

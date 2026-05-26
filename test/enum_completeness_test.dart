@@ -77,6 +77,23 @@ void main() {
     expect(issues, isEmpty);
   });
 
+  test('enumMemberIntroductionIssues ignores simple enums', () {
+    final ParsedComponentInfoInfo info =
+        _enumInfo('TAvatarSize', <({String name, String introduction})>[
+          (name: 'small', introduction: ''),
+          (name: 'medium', introduction: ''),
+          (name: 'large', introduction: ''),
+        ]);
+    info.componentInfo!.isSimpleEnum = true;
+
+    final issues = enumMemberIntroductionIssues(
+      'avatar',
+      <ParsedComponentInfoInfo>[info],
+    );
+
+    expect(issues, isEmpty);
+  });
+
   test('enumMemberIntroductionIssues ignores non-enum entries', () {
     final issues = enumMemberIntroductionIssues(
       'calendar',

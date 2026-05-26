@@ -79,6 +79,9 @@ class ComponentInfo {
   /// 枚举成员详情（仅 kind == enum）
   List<EnumMemberInfo> enumMembers = [];
 
+  /// 是否为简单枚举（使用 `// doc-simple-enum` 标记）
+  bool isSimpleEnum = false;
+
   /// typedef 定义源码（仅 kind == typedef）
   String typedefDefinition = '';
 

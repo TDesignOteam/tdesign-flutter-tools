@@ -55,6 +55,21 @@
 - enum 本身应有总说明，解释这组取值的用途
 - enum 成员应补充 `///` 注释；当前工具会将成员说明展示在「枚举值」表中
 - 若成员未写注释，文档说明列会显示 `-`；`validate` 会将其视为源码问题并给出 `source/WARN`
+- 若枚举值本身语义极其直观（如 `small` / `medium` / `large`、`circle` / `square`），可在 enum 前添加普通注释 `// doc-simple-enum`，表示成员说明可省略；该标记不会进入 Flutter / dartdoc 正式文档注释
+
+`simple enum` 示例：
+
+```dart
+// doc-simple-enum
+/// 头像尺寸
+enum TAvatarSize { small, medium, large }
+```
+
+对于 `simple enum`：
+
+- 文档中的「枚举值」改为仅展示名称，不再渲染整列 `-`
+- `validate` 不再对成员缺少说明发出告警
+- 若成员语义后续变复杂，应移除该标记并补充 `///` 注释
 
 建议优先补齐以下类型的成员说明：
 
