@@ -5,13 +5,15 @@ class ComponentConfig {
   ComponentConfig();
 
   factory ComponentConfig.fromJson(Map<String, dynamic> json) {
-    return ComponentConfig()..componentList = (json['componentList'] as List?)?.map((e) => ComponentInfo.fromJson(e as Map<String, dynamic>)).toList();
+    return ComponentConfig()
+      ..componentList =
+          (json['componentList'] as List?)
+              ?.map((e) => ComponentInfo.fromJson(e as Map<String, dynamic>))
+              .toList();
   }
 
   Map<String, dynamic> toJson() {
-    return <String, dynamic>{
-      'componentList': componentList,
-    };
+    return <String, dynamic>{'componentList': componentList};
   }
 
   // 组件信息
@@ -29,7 +31,10 @@ class ComponentInfo {
       ..owner = json['owner'] as String?
       ..group = json['group'] as String?
       ..introduction = json['introduction'] as String?
-      ..demoList = ((json['demoList'] ?? []) as List).map((e) => DemoInfo.fromJson(e as Map<String, dynamic>)).toList();
+      ..demoList =
+          ((json['demoList'] ?? []) as List)
+              .map((e) => DemoInfo.fromJson(e as Map<String, dynamic>))
+              .toList();
   }
 
   //组件的简介
@@ -189,10 +194,13 @@ class PropertyInfo {
 
 class ParsedComponentInfoInfo {
   ComponentInfo? componentInfo;
+
   /// 默认构造方法的形式参数
   late List<PropertyInfo> propertyList;
+
   /// 未出现在默认构造中、但对外可见的实例字段
   late List<PropertyInfo> extraPropertyList;
+
   /// 静态成员（含 static const 等）
   late List<PropertyInfo> staticMemberList;
   late Map<String, PropertyInfo> fieldMap;
@@ -211,7 +219,8 @@ class CommandInfo {
 
   // 命令是否有效
   bool isValid() {
-    return (file != null && file!.isNotEmpty) || (folder != null && folder!.isNotEmpty);
+    return (file != null && file!.isNotEmpty) ||
+        (folder != null && folder!.isNotEmpty);
   }
 
   bool isFileMode() {
@@ -261,4 +270,13 @@ class StaticMethodInfo {
 
   // 方法说明
   String? introduction;
+
+  // 显式透传到的目标类型名（仅在 AST 可证明时记录）
+  String? forwardedTargetName;
+
+  // 目标命名构造名；null / 空表示默认构造
+  String? forwardedConstructorName;
+
+  // 当前方法参数名 -> 目标构造参数名
+  Map<String, String> forwardedParamMap = {};
 }
