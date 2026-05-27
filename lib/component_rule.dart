@@ -312,6 +312,53 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
           '${candidate.targetClassName}|${candidate.targetConstructorName ?? ''}|$mappingKey';
       candidates.putIfAbsent(dedupeKey, () => candidate);
     }
+    _applyBestForwardingCandidate(candidates, methodInfo);
+  }
+
+  void _captureConstructorExplicitForwarding(
+    ConstructorDeclaration node,
+    StaticMethodInfo methodInfo,
+  ) {
+    if (node.body is EmptyFunctionBody) {
+      return;
+    }
+    final Set<String> constructorParamNames =
+        methodInfo.params
+            .map((PropertyInfo p) => p.name)
+            .where((String name) => name.isNotEmpty)
+            .toSet();
+    if (constructorParamNames.isEmpty) {
+      return;
+    }
+    final _ConstructorLikeCallCollector collector =
+        _ConstructorLikeCallCollector(knownTypeNames: nameList!.toSet());
+    node.body.accept(collector);
+    final Map<String, _ForwardingCandidate> candidates =
+        <String, _ForwardingCandidate>{};
+    for (final _ConstructorLikeCall call in collector.calls) {
+      final _ForwardingCandidate? candidate = _buildConstructorForwardingCandidate(
+        call,
+        node,
+        constructorParamNames,
+      );
+      if (candidate == null) {
+        continue;
+      }
+      final List<String> sortedKeys = candidate.paramMap.keys.toList()..sort();
+      final String mappingKey = sortedKeys
+          .map((String key) => '$key:${candidate.paramMap[key]}')
+          .join(',');
+      final String dedupeKey =
+          '${candidate.targetClassName}|${candidate.targetConstructorName ?? ''}|$mappingKey';
+      candidates.putIfAbsent(dedupeKey, () => candidate);
+    }
+    _applyBestForwardingCandidate(candidates, methodInfo);
+  }
+
+  void _applyBestForwardingCandidate(
+    Map<String, _ForwardingCandidate> candidates,
+    StaticMethodInfo methodInfo,
+  ) {
     if (candidates.isEmpty) {
       return;
     }
@@ -378,6 +425,46 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
     );
   }
 
+  _ForwardingCandidate? _buildConstructorForwardingCandidate(
+    _ConstructorLikeCall call,
+    ConstructorDeclaration ownerConstructor,
+    Set<String> constructorParamNames,
+  ) {
+    final String targetClassName = call.targetClassName;
+    if (targetClassName.startsWith('_') ||
+        !nameList!.contains(targetClassName)) {
+      return null;
+    }
+    final Map<String, String> paramMap = <String, String>{};
+    for (final Expression argument in call.argumentList.arguments) {
+      if (argument is! NamedExpression) {
+        continue;
+      }
+      final String? sourceParamName = _extractDirectConstructorParameterReference(
+        argument.expression,
+        ownerConstructor,
+        constructorParamNames,
+      );
+      if (sourceParamName == null) {
+        continue;
+      }
+      final String targetParamName = argument.name.label.name;
+      final String? previousTarget = paramMap[sourceParamName];
+      if (previousTarget != null && previousTarget != targetParamName) {
+        return null;
+      }
+      paramMap[sourceParamName] = targetParamName;
+    }
+    if (paramMap.isEmpty) {
+      return null;
+    }
+    return _ForwardingCandidate(
+      targetClassName: targetClassName,
+      targetConstructorName: call.targetConstructorName,
+      paramMap: paramMap,
+    );
+  }
+
   String? _extractDirectMethodParameterReference(
     Expression expression,
     MethodDeclaration ownerMethod,
@@ -403,6 +490,43 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
     final String name = identifier.name;
     AstNode? current = identifier.parent;
     while (current != null && current != ownerMethod) {
+      if (current is FunctionExpression &&
+          _functionParametersContainName(current.parameters, name)) {
+        return true;
+      }
+      current = current.parent;
+    }
+    return false;
+  }
+
+  String? _extractDirectConstructorParameterReference(
+    Expression expression,
+    ConstructorDeclaration ownerConstructor,
+    Set<String> constructorParamNames,
+  ) {
+    if (expression is! SimpleIdentifier) {
+      return null;
+    }
+    final String name = expression.name;
+    if (!constructorParamNames.contains(name)) {
+      return null;
+    }
+    if (_isShadowedByEnclosingFunctionInConstructor(
+      expression,
+      ownerConstructor,
+    )) {
+      return null;
+    }
+    return name;
+  }
+
+  bool _isShadowedByEnclosingFunctionInConstructor(
+    SimpleIdentifier identifier,
+    ConstructorDeclaration ownerConstructor,
+  ) {
+    final String name = identifier.name;
+    AstNode? current = identifier.parent;
+    while (current != null && current != ownerConstructor) {
       if (current is FunctionExpression &&
           _functionParametersContainName(current.parameters, name)) {
         return true;
@@ -553,15 +677,20 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
       }
       _allClassConstructorDefaults[_currentClassName!] = ctorDefaults;
     } else if (_isInTargetClass) {
-      // 记录工厂构造方法
+      final String constructorName = node.name!.lexeme;
+      if (isLibraryPrivateNamedConstructor(constructorName)) {
+        return;
+      }
+      // 记录命名/工厂构造方法
       final StaticMethodInfo staticMethodInfo = StaticMethodInfo();
-      staticMethodInfo.name = node.name.toString();
+      staticMethodInfo.name = constructorName;
       staticMethodInfo.introduction = removeDocumentationComment(
         node.documentationComment?.tokens.join('\n') ?? '',
       );
       for (final FormalParameter element in node.parameters.parameters) {
         staticMethodInfo.params.add(_buildPropertyFromParameter(element));
       }
+      _captureConstructorExplicitForwarding(node, staticMethodInfo);
       componentInfo ??= ComponentInfo();
       componentInfo!.constructorMethodList.add(staticMethodInfo);
     }
