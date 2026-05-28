@@ -270,9 +270,8 @@ String formatDocumentationForMarkdown(String? raw) {
   return parseDocumentation(raw).narrative;
 }
 
-/// 在“简介”阶段剥离 `**示例**` 标题及其紧随的 fenced code block。
-/// 仅用于简介展示，不影响方法参数文档解析。
-String stripExampleSectionForIntroduction(String text) {
+/// 简介正文：去掉 `**示例**` 段及所有 fenced 代码块（API 简介不放代码块）。
+String stripIntroductionForApiSummary(String text) {
   if (text.isEmpty) {
     return text;
   }
@@ -282,6 +281,10 @@ String stripExampleSectionForIntroduction(String text) {
   );
   var cleaned = text.replaceAll(exampleWithFence, '\n');
   cleaned = cleaned.replaceAll(RegExp(r'(^|\n)\s*\*\*示例\*\*\s*(?=\n|$)'), '\n');
+  cleaned = cleaned.replaceAll(
+    RegExp(r'(^|\n)```[\s\S]*?```', multiLine: true),
+    '\n',
+  );
   while (cleaned.contains('\n\n\n')) {
     cleaned = cleaned.replaceAll('\n\n\n', '\n\n');
   }

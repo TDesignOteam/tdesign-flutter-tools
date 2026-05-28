@@ -29,6 +29,56 @@ List<ParsedComponentInfoInfo> _analyse(List<String> names, String relPath) {
   ).analyse();
 }
 
+List<ParsedComponentInfoInfo> _analyseFixture(
+  List<String> names,
+  String fixtureFile,
+) {
+  final String path = fixtureSourcePath(fixtureFile);
+  final col = AnalysisContextCollection(
+    includedPaths: [path],
+    resourceProvider: PhysicalResourceProvider.INSTANCE,
+  );
+  final parsed =
+      col.contextFor(path).currentSession.getParsedUnit(path) as ParsedUnitResult;
+  return ComponentRule(
+    parsedUnitResult: parsed,
+    isGrammarParser: false,
+    nameList: names,
+    sourceFileName: fixtureFile,
+  ).analyse();
+}
+
+Future<String> _generateFixtureApi({
+  required List<String> names,
+  required String fixtureFile,
+  required String folderName,
+  required bool getComments,
+}) async {
+  final List<ParsedComponentInfoInfo> infos = _analyseFixture(names, fixtureFile);
+  final Directory tempDir = await Directory.systemTemp.createTemp(
+    'tdesign_api_gen_${folderName}_',
+  );
+  try {
+    final CommandInfo commandInfo = CommandInfo()
+      ..isGetComments = getComments
+      ..isOnlyApi = true;
+    final SmartCreator creator = SmartCreator(
+      nameList: names,
+      basePath: tempDir.path,
+      folderName: folderName,
+      output: '',
+      isFileMode: true,
+      onlyApi: true,
+      isGrammarParser: false,
+      commandInfo: commandInfo,
+    );
+    await creator.generateApiInfoFile(infos);
+    return File(p.join(tempDir.path, '${folderName}_api.md')).readAsString();
+  } finally {
+    await tempDir.delete(recursive: true);
+  }
+}
+
 PropertyInfo? _staticParam(
   ParsedComponentInfoInfo info,
   String methodName,
@@ -86,6 +136,44 @@ void main() {
     expect(onLinkClick!.introduction, '点击链接文本时触发');
   });
 
+  test('generateApiInfoFile omits 简介 without --get-comments', () async {
+    final String path = fixtureSourcePath('static_method_doc_fixture.dart');
+    final col = AnalysisContextCollection(
+      includedPaths: [path],
+      resourceProvider: PhysicalResourceProvider.INSTANCE,
+    );
+    final parsed =
+        col.contextFor(path).currentSession.getParsedUnit(path) as ParsedUnitResult;
+    final info = ComponentRule(
+      parsedUnitResult: parsed,
+      isGrammarParser: false,
+      nameList: ['DemoPopup'],
+      sourceFileName: 'static_method_doc_fixture.dart',
+    ).analyse().first;
+    final Directory tempDir = await Directory.systemTemp.createTemp(
+      'tdesign_demo_popup_no_intro_',
+    );
+
+    try {
+      final creator = SmartCreator(
+        nameList: ['DemoPopup'],
+        basePath: tempDir.path,
+        folderName: 'demo_popup',
+        output: '',
+        isFileMode: true,
+        onlyApi: true,
+        isGrammarParser: false,
+      );
+      await creator.generateApiInfoFile([info]);
+      final content =
+          await File(p.join(tempDir.path, 'demo_popup_api.md')).readAsString();
+      expect(content, isNot(contains('#### 简介')));
+      expect(content, contains('##### DemoPopup.show'));
+    } finally {
+      await tempDir.delete(recursive: true);
+    }
+  });
+
   test('generateApiInfoFile renders DemoPopup.show with formatted docs', () async {
     final String path = fixtureSourcePath('static_method_doc_fixture.dart');
     final col = AnalysisContextCollection(
@@ -105,6 +193,9 @@ void main() {
     );
 
     try {
+      final CommandInfo commandInfo = CommandInfo()
+        ..isGetComments = true
+        ..isOnlyApi = true;
       final creator = SmartCreator(
         nameList: ['DemoPopup'],
         basePath: tempDir.path,
@@ -113,6 +204,7 @@ void main() {
         isFileMode: true,
         onlyApi: true,
         isGrammarParser: false,
+        commandInfo: commandInfo,
       );
       await creator.generateApiInfoFile([info]);
       final content =
@@ -240,4 +332,53 @@ void main() {
       }
     },
   );
+
+  group('generateApiInfoFile --get-comments and section separators', () {
+    test('does not insert empty ``` fence between multiple types', () async {
+      final String content = await _generateFixtureApi(
+        names: <String>['TypeAlpha', 'TypeBeta'],
+        fixtureFile: 'multi_type_intro_fixture.dart',
+        folderName: 'multi_type',
+        getComments: true,
+      );
+
+      expect(content, contains('### TypeAlpha'));
+      expect(content, contains('### TypeBeta'));
+      expect(content, isNot(contains('```\n```')));
+      expect(content, isNot(matches(RegExp(r'```\s*\n\s*```'))));
+
+      final RegExpMatch? sectionGap = RegExp(
+        r'### TypeAlpha[\s\S]*?\n\n### TypeBeta',
+      ).firstMatch(content);
+      expect(sectionGap, isNotNull);
+      expect(sectionGap!.group(0), isNot(contains('```')));
+    });
+
+    test('with --get-comments writes intro without fenced code blocks', () async {
+      final String content = await _generateFixtureApi(
+        names: <String>['TypeAlpha'],
+        fixtureFile: 'multi_type_intro_fixture.dart',
+        folderName: 'multi_type_intro',
+        getComments: true,
+      );
+
+      expect(content, contains('#### 简介'));
+      expect(content, contains('第一个组件说明'));
+      expect(content, isNot(contains('TypeAlpha.demo()')));
+      expect(content, isNot(matches(RegExp(r'#### 简介[\s\S]*```'))));
+    });
+
+    test('without --get-comments omits intro for all kinds', () async {
+      final String content = await _generateFixtureApi(
+        names: <String>['TypeAlpha', 'TypeBeta'],
+        fixtureFile: 'multi_type_intro_fixture.dart',
+        folderName: 'multi_type_no_intro',
+        getComments: false,
+      );
+
+      expect(content, isNot(contains('#### 简介')));
+      expect(content, isNot(contains('第一个组件说明')));
+      expect(content, isNot(contains('第二个组件说明')));
+    });
+  });
 }

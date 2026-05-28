@@ -21,8 +21,10 @@
 4. **不要把静态方法参数表只写在类简介里**  
    类注释中的 `## xxx 参数` Markdown 表**不会**回填到方法参数表，方法表仍会显示 `-`。
 
-5. **类简介中的 `**示例**` 代码块不会进入 API 简介**  
-   工具会在输出 `#### 简介` 时自动剥离 `**示例**` 及其后紧随的 `` ``` `` 代码块；示例可保留在源码类注释中。
+5. **`--get-comments` 控制是否输出 `#### 简介`**  
+   - 不加：只生成参数表、工厂、枚举值等，**不写**类简介。  
+   - 加上：输出简介，并自动去掉 `**示例**` 与所有 `` ``` `` 代码块（简介里不放代码）。  
+   旧版曾在多类型之间误插入空 `` ``` `` 两行，当前已移除；请用 `dart run bin/main.dart` 生成。
 
 6. **`library` + `part` 需在 `--name` 中显式列出类型**  
    例如 popup 的 `TPopupOptions`、`TPopupPlacement` 在 part 文件中，需写入 `--name` 或单独对 part 文件生成。
@@ -54,6 +56,7 @@ dart run $TOOLS/bin/main.dart generate \
   --name TPopup,TPopupOptions,TPopupHandle,TPopupPlacement,TPopupTrigger \
   --folder-name popup \
   --only-api \
+  --get-comments \
   --output $TOOLS/tmp-local-preview/popup/
 ```
 

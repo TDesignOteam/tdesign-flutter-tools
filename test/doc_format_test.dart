@@ -89,7 +89,7 @@ final x = [1];
     expect(result.narrative, isEmpty);
   });
 
-  test('stripExampleSectionForIntroduction removes 示例 heading and code block', () {
+  test('stripIntroductionForApiSummary removes 示例 and other fenced blocks', () {
     const raw = '''
 第一段说明。
 
@@ -101,21 +101,22 @@ final a = 1;
 第二段说明。
 ''';
     expect(
-      stripExampleSectionForIntroduction(raw),
+      stripIntroductionForApiSummary(raw),
       '第一段说明。\n\n第二段说明。',
     );
   });
 
-  test('stripExampleSectionForIntroduction keeps non-example code blocks', () {
+  test('stripIntroductionForApiSummary removes standalone fenced blocks', () {
     const raw = '''
 第一段说明。
+
 ```dart
 final a = 1;
 ```
+
+第二段说明。
 ''';
-    expect(
-      stripExampleSectionForIntroduction(raw),
-      raw.trim(),
-    );
+    expect(stripIntroductionForApiSummary(raw), '第一段说明。\n\n第二段说明。');
+    expect(stripIntroductionForApiSummary(raw), isNot(contains('```')));
   });
 }
