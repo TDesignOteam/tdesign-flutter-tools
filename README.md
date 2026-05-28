@@ -37,6 +37,7 @@
 | 同文件内自动收录 public 的 enum / typedef | 也可在 `--name` 中显式指定枚举或别名名称 |
 | folder 模式下检测跨文件重复 enum/typedef 并告警 | 文档保留重复条目以暴露源码问题，工具不做 silent dedupe |
 | Markdown 表格转义、方法参数格式化 | 无注释时说明列显示 `-`（符合预期） |
+| dartdoc 通用处理：`///`/`/** */` 规范化、`[Type]`/`[param]` 引用转 Markdown、方法块内 `[paramName]` 拆入参数表 | 参数说明优先写在对应形参或 `[paramName]` 文档行；已有 Markdown 链接 `[text](url)` 保持原样 |
 
 **原则：** 注释不合规导致的文档问题，应在组件源码中补全/修正 `///` 注释，而不是在工具里打补丁。
 

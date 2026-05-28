@@ -10,6 +10,7 @@ import 'package:path/path.dart';
 import 'package:analyzer/dart/analysis/results.dart';
 
 import 'component_rule.dart';
+import 'documentation.dart';
 import 'model.dart';
 import 'util.dart';
 
@@ -359,12 +360,14 @@ class SmartCreator {
       }
       sb.write('### ${apiInfo.componentInfo!.name}');
       final introduction = apiInfo.componentInfo!.introduction ?? '';
+      final String introForSummary =
+          stripExampleSectionForIntroduction(introduction);
       final String kind = apiInfo.componentInfo?.kind ?? 'class';
 
       if (kind == 'enum') {
-        if (introduction.isNotEmpty) {
+        if (introForSummary.isNotEmpty) {
           sb.write('\n#### 简介\n');
-          sb.write(introduction);
+          sb.write(introForSummary);
         }
         final List<EnumMemberInfo> enumMembers =
             apiInfo.componentInfo!.enumMembers;
@@ -412,9 +415,9 @@ class SmartCreator {
       }
 
       if (kind == 'typedef') {
-        if (introduction.isNotEmpty) {
+        if (introForSummary.isNotEmpty) {
           sb.write('\n#### 简介\n');
-          sb.write(introduction);
+          sb.write(introForSummary);
         }
         if (apiInfo.componentInfo!.typedefDefinition.isNotEmpty) {
           sb.write('\n#### 类型定义\n\n');
@@ -425,22 +428,9 @@ class SmartCreator {
         continue;
       }
 
-      // 无任何可渲染内容（如 sealed 基类）或有实例方法（如 abstract class），都强制显示简介
-      final hasNoContent =
-          apiInfo.propertyList.isEmpty &&
-          apiInfo.extraPropertyList.isEmpty &&
-          apiInfo.staticMemberList.isEmpty &&
-          (apiInfo.componentInfo?.constructorMethodList.isEmpty ?? true) &&
-          (apiInfo.componentInfo?.staticMethodList.isEmpty ?? true) &&
-          (apiInfo.componentInfo?.instanceMethodList.isEmpty ?? true);
-      final hasInstanceMethods =
-          apiInfo.componentInfo?.instanceMethodList.isNotEmpty ?? false;
-      if (((commandInfo?.isGetComments ?? false) ||
-              hasNoContent ||
-              hasInstanceMethods) &&
-          introduction.isNotEmpty) {
+      if (introForSummary.isNotEmpty) {
         sb.write('\n#### 简介\n');
-        sb.write(introduction);
+        sb.write(introForSummary);
       }
       StaticMethodInfo? currentMethod;
 
@@ -458,7 +448,7 @@ class SmartCreator {
 | --- | --- | --- | --- |\n''');
         for (final PropertyInfo item in items) {
           sb.write(
-            '''| ${sanitizeTableCell(item.name)} | ${sanitizeTableCell(item.type.isEmpty ? '-' : item.type)} | ${sanitizeTableCell(item.defaultValue)} | ${sanitizeTableCell(item.introduction)} |\n''',
+            '''| ${sanitizeTableCell(item.name)} | ${sanitizeTableCell(item.type.isEmpty ? '-' : item.type)} | ${sanitizeTableCell(item.defaultValue)} | ${sanitizeTableCell(item.introduction.isEmpty ? '-' : item.introduction)} |\n''',
           );
         }
       }
@@ -534,7 +524,7 @@ class SmartCreator {
                   ? forwardedParam.introduction
                   : param.introduction;
           sb.write(
-            '''| ${sanitizeTableCell(param.name)} | ${sanitizeTableCell(type.isEmpty ? '-' : type)} | ${sanitizeTableCell(param.defaultValue)} | ${sanitizeTableCell(introduction)} |\n''',
+            '''| ${sanitizeTableCell(param.name)} | ${sanitizeTableCell(type.isEmpty ? '-' : type)} | ${sanitizeTableCell(param.defaultValue)} | ${sanitizeTableCell(introduction.isEmpty ? '-' : introduction)} |\n''',
           );
         }
       }
@@ -683,7 +673,7 @@ class SmartCreator {
           final returnType =
               item.returnType == "null" ? "" : (item.returnType ?? "");
           sb.write(
-            '| ${sanitizeTableCell(item.name)} | ${sanitizeTableCell(returnType)} | ${sanitizeTableCell(formatMethodParams(item.params))} | ${sanitizeTableCell(item.introduction)} |\n',
+            '| ${sanitizeTableCell(item.name)} | ${sanitizeTableCell(returnType)} | ${sanitizeTableCell(formatMethodParams(item.params))} | ${sanitizeTableCell(item.introduction == null || item.introduction!.isEmpty ? '-' : item.introduction)} |\n',
           );
         }
       }

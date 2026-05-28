@@ -5,6 +5,7 @@ import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/visitor.dart';
+import 'documentation.dart';
 import 'model.dart';
 import 'util.dart';
 
@@ -155,7 +156,7 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
           ..kind = 'enum'
           ..isSimpleEnum = simpleEnumNames.contains(name);
     if (node.documentationComment != null) {
-      componentInfo.introduction = removeDocumentationComment(
+      componentInfo.introduction = formatDocumentationForMarkdown(
         node.documentationComment!.tokens.join('\n'),
       );
     }
@@ -163,7 +164,7 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
       final EnumMemberInfo member =
           EnumMemberInfo()..name = constant.name.lexeme;
       if (constant.documentationComment != null) {
-        member.introduction = removeDocumentationComment(
+        member.introduction = formatDocumentationForMarkdown(
           constant.documentationComment!.tokens.join('\n'),
         );
       }
@@ -187,7 +188,7 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
           ..typedefDefinition =
               'typedef ${node.name.lexeme} = ${node.type.toSource()};';
     if (node.documentationComment != null) {
-      componentInfo.introduction = removeDocumentationComment(
+      componentInfo.introduction = formatDocumentationForMarkdown(
         node.documentationComment!.tokens.join('\n'),
       );
     }
@@ -684,12 +685,12 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
       // 记录命名/工厂构造方法
       final StaticMethodInfo staticMethodInfo = StaticMethodInfo();
       staticMethodInfo.name = constructorName;
-      staticMethodInfo.introduction = removeDocumentationComment(
-        node.documentationComment?.tokens.join('\n') ?? '',
-      );
+      staticMethodInfo.introduction =
+          node.documentationComment?.tokens.join('\n') ?? '';
       for (final FormalParameter element in node.parameters.parameters) {
         staticMethodInfo.params.add(_buildPropertyFromParameter(element));
       }
+      applyCallableDocumentation(staticMethodInfo);
       _captureConstructorExplicitForwarding(node, staticMethodInfo);
       componentInfo ??= ComponentInfo();
       componentInfo!.constructorMethodList.add(staticMethodInfo);
@@ -716,11 +717,11 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
     item.isStatic = node.staticKeyword != null;
     item.type = node.fields.type?.toString() ?? '';
     if (node.documentationComment != null) {
-      item.introduction = removeDocumentationComment(
+      item.introduction = formatDocumentationForMarkdown(
         node.documentationComment!.tokens.join('\n'),
       );
     } else if (node.beginToken.toString().startsWith('///')) {
-      item.introduction = removeDocumentationComment(
+      item.introduction = formatDocumentationForMarkdown(
         node.beginToken.toString(),
       );
     }
@@ -795,7 +796,7 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
       componentInfo ??= ComponentInfo();
       componentInfo!.name = className;
       if (node.documentationComment != null) {
-        componentInfo!.introduction = removeDocumentationComment(
+        componentInfo!.introduction = formatDocumentationForMarkdown(
           node.documentationComment!.tokens.join('\n'),
         );
       }
@@ -862,13 +863,13 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
 
     StaticMethodInfo methodInfo = StaticMethodInfo();
     methodInfo.name = methodName;
-    methodInfo.introduction = removeDocumentationComment(
-      node.documentationComment?.tokens.join('\n') ?? '',
-    );
+    methodInfo.introduction =
+        node.documentationComment?.tokens.join('\n') ?? '';
     methodInfo.returnType = node.returnType?.toSource();
     node.parameters?.parameters.forEach((FormalParameter element) {
       methodInfo.params.add(_buildPropertyFromParameter(element));
     });
+    applyCallableDocumentation(methodInfo);
     _captureExplicitForwarding(node, methodInfo);
 
     componentInfo ??= ComponentInfo();
@@ -1000,7 +1001,7 @@ class ComponentVisitor extends RecursiveElementVisitor<void> {
     ComponentInfo componentInfo = ComponentInfo();
     componentInfo.name = element.displayName;
     if (element.documentationComment != null) {
-      componentInfo.introduction = removeDocumentationComment(
+      componentInfo.introduction = formatDocumentationForMarkdown(
         element.documentationComment!,
       );
     }
@@ -1054,7 +1055,7 @@ class ComponentVisitor extends RecursiveElementVisitor<void> {
       final hasDocumentation = field.documentationComment != null;
 
       return hasDocumentation
-          ? removeDocumentationComment(field.documentationComment!)
+          ? formatDocumentationForMarkdown(field.documentationComment!)
           : null;
     }
     return null;
