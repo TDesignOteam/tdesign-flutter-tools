@@ -23,6 +23,9 @@ String formalParameterName(FormalParameter param) {
   return param.name?.lexeme ?? '';
 }
 
+/// Dart 库级私有命名构造（如 `ClassName._`），不应对外 API 文档展示。
+bool isLibraryPrivateNamedConstructor(String? name) => name == '_';
+
 /// 从构造/方法参数 AST 提取类型字符串
 String extractFormalParameterType(
   FormalParameter param, {

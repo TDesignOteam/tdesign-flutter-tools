@@ -10,6 +10,7 @@ import 'package:path/path.dart';
 import 'package:analyzer/dart/analysis/results.dart';
 
 import 'component_rule.dart';
+import 'documentation.dart';
 import 'model.dart';
 import 'util.dart';
 
@@ -359,12 +360,14 @@ class SmartCreator {
       }
       sb.write('### ${apiInfo.componentInfo!.name}');
       final introduction = apiInfo.componentInfo!.introduction ?? '';
+      final String introForSummary =
+          stripExampleSectionForIntroduction(introduction);
       final String kind = apiInfo.componentInfo?.kind ?? 'class';
 
       if (kind == 'enum') {
-        if (introduction.isNotEmpty) {
+        if (introForSummary.isNotEmpty) {
           sb.write('\n#### 简介\n');
-          sb.write(introduction);
+          sb.write(introForSummary);
         }
         final List<EnumMemberInfo> enumMembers =
             apiInfo.componentInfo!.enumMembers;
@@ -412,9 +415,9 @@ class SmartCreator {
       }
 
       if (kind == 'typedef') {
-        if (introduction.isNotEmpty) {
+        if (introForSummary.isNotEmpty) {
           sb.write('\n#### 简介\n');
-          sb.write(introduction);
+          sb.write(introForSummary);
         }
         if (apiInfo.componentInfo!.typedefDefinition.isNotEmpty) {
           sb.write('\n#### 类型定义\n\n');
@@ -425,22 +428,9 @@ class SmartCreator {
         continue;
       }
 
-      // 无任何可渲染内容（如 sealed 基类）或有实例方法（如 abstract class），都强制显示简介
-      final hasNoContent =
-          apiInfo.propertyList.isEmpty &&
-          apiInfo.extraPropertyList.isEmpty &&
-          apiInfo.staticMemberList.isEmpty &&
-          (apiInfo.componentInfo?.constructorMethodList.isEmpty ?? true) &&
-          (apiInfo.componentInfo?.staticMethodList.isEmpty ?? true) &&
-          (apiInfo.componentInfo?.instanceMethodList.isEmpty ?? true);
-      final hasInstanceMethods =
-          apiInfo.componentInfo?.instanceMethodList.isNotEmpty ?? false;
-      if (((commandInfo?.isGetComments ?? false) ||
-              hasNoContent ||
-              hasInstanceMethods) &&
-          introduction.isNotEmpty) {
+      if (introForSummary.isNotEmpty) {
         sb.write('\n#### 简介\n');
-        sb.write(introduction);
+        sb.write(introForSummary);
       }
       StaticMethodInfo? currentMethod;
 
@@ -458,7 +448,7 @@ class SmartCreator {
 | --- | --- | --- | --- |\n''');
         for (final PropertyInfo item in items) {
           sb.write(
-            '''| ${sanitizeTableCell(item.name)} | ${sanitizeTableCell(item.type.isEmpty ? '-' : item.type)} | ${sanitizeTableCell(item.defaultValue)} | ${sanitizeTableCell(item.introduction)} |\n''',
+            '''| ${sanitizeTableCell(item.name)} | ${sanitizeTableCell(item.type.isEmpty ? '-' : item.type)} | ${sanitizeTableCell(item.defaultValue)} | ${sanitizeTableCell(item.introduction.isEmpty ? '-' : item.introduction)} |\n''',
           );
         }
       }
@@ -534,7 +524,7 @@ class SmartCreator {
                   ? forwardedParam.introduction
                   : param.introduction;
           sb.write(
-            '''| ${sanitizeTableCell(param.name)} | ${sanitizeTableCell(type.isEmpty ? '-' : type)} | ${sanitizeTableCell(param.defaultValue)} | ${sanitizeTableCell(introduction)} |\n''',
+            '''| ${sanitizeTableCell(param.name)} | ${sanitizeTableCell(type.isEmpty ? '-' : type)} | ${sanitizeTableCell(param.defaultValue)} | ${sanitizeTableCell(introduction.isEmpty ? '-' : introduction)} |\n''',
           );
         }
       }
@@ -543,6 +533,7 @@ class SmartCreator {
         List<StaticMethodInfo> methods, {
         required String header,
         bool includeReturnType = false,
+        bool compactCommonForwardedParams = false,
       }) {
         if (methods.isEmpty) {
           return;
@@ -552,6 +543,49 @@ class SmartCreator {
           (StaticMethodInfo a, StaticMethodInfo b) =>
               a.name!.toLowerCase().compareTo(b.name!.toLowerCase()),
         );
+        final Set<String> commonForwardedParams = <String>{};
+        if (compactCommonForwardedParams && methods.length > 1) {
+          Set<String>? common;
+          for (final StaticMethodInfo method in methods) {
+            final bool hasForwardedInfo =
+                method.forwardedTargetName == apiInfo.componentInfo!.name &&
+                (method.forwardedConstructorName == null ||
+                    method.forwardedConstructorName!.isEmpty);
+            if (!hasForwardedInfo) {
+              common = <String>{};
+              break;
+            }
+            final Set<String> forwardedCurrent =
+                method.params
+                    .where(
+                      (PropertyInfo param) =>
+                          method.forwardedParamMap[param.name] == param.name,
+                    )
+                    .map((PropertyInfo p) => p.name)
+                    .toSet();
+            common = common == null
+                ? forwardedCurrent
+                : common.intersection(forwardedCurrent);
+            if (common.isEmpty) {
+              break;
+            }
+          }
+          if (common != null && common.isNotEmpty) {
+            commonForwardedParams.addAll(common);
+            final List<PropertyInfo> commonParamRows = methods.first.params
+                .where((PropertyInfo param) => commonForwardedParams.contains(param.name))
+                .toList()
+              ..sort(
+                (PropertyInfo a, PropertyInfo b) => a.name
+                    .toLowerCase()
+                    .compareTo(b.name.toLowerCase()),
+              );
+            currentMethod = methods.first;
+            sb.write('\n\n##### 通用参数');
+            sb.write('\n\n以下参数由各命名工厂统一透传，含义一致：');
+            writeMethodParamTable(commonParamRows);
+          }
+        }
         for (final StaticMethodInfo item in methods) {
           currentMethod = item;
           sb.write(
@@ -565,11 +599,44 @@ class SmartCreator {
           if (includeReturnType && returnType.isNotEmpty) {
             sb.write('\n\n返回类型：`$returnType`');
           }
-          writeMethodParamTable(item.params);
+          final List<PropertyInfo> params = commonForwardedParams.isEmpty
+              ? item.params
+              : item.params
+                    .where(
+                      (PropertyInfo param) =>
+                          !commonForwardedParams.contains(param.name),
+                    )
+                    .toList();
+          if (commonForwardedParams.isNotEmpty) {
+            sb.write('\n\n其余参数见「通用参数」。');
+          }
+          writeMethodParamTable(params);
         }
         currentMethod = null;
       }
 
+      // 对外 API 优先：命令式入口 → 命名工厂 → 默认构造 → 字段/成员 → 实例方法
+      if (apiInfo.componentInfo?.staticMethodList.isNotEmpty ?? false) {
+        writeMethodDetails(
+          apiInfo.componentInfo!.staticMethodList,
+          header: '静态方法',
+          includeReturnType: true,
+        );
+      }
+      final List<StaticMethodInfo> publicNamedConstructors =
+          apiInfo.componentInfo!.constructorMethodList
+              .where(
+                (StaticMethodInfo method) =>
+                    !isLibraryPrivateNamedConstructor(method.name),
+              )
+              .toList();
+      if (publicNamedConstructors.isNotEmpty) {
+        writeMethodDetails(
+          publicNamedConstructors,
+          header: '工厂构造方法',
+          compactCommonForwardedParams: true,
+        );
+      }
       if (apiInfo.propertyList.isNotEmpty) {
         // 用 fieldMap 补全构造参数缺失的类型和说明
         for (final PropertyInfo element in apiInfo.propertyList) {
@@ -596,19 +663,6 @@ class SmartCreator {
         header: '静态成员',
         nameColumn: '名称',
       );
-      if (apiInfo.componentInfo?.constructorMethodList.isNotEmpty ?? false) {
-        writeMethodDetails(
-          apiInfo.componentInfo!.constructorMethodList,
-          header: '工厂构造方法',
-        );
-      }
-      if (apiInfo.componentInfo?.staticMethodList.isNotEmpty ?? false) {
-        writeMethodDetails(
-          apiInfo.componentInfo!.staticMethodList,
-          header: '静态方法',
-          includeReturnType: true,
-        );
-      }
       if (apiInfo.componentInfo?.instanceMethodList.isNotEmpty ?? false) {
         sb.write("\n\n");
         sb.write("#### 方法");
@@ -619,7 +673,7 @@ class SmartCreator {
           final returnType =
               item.returnType == "null" ? "" : (item.returnType ?? "");
           sb.write(
-            '| ${sanitizeTableCell(item.name)} | ${sanitizeTableCell(returnType)} | ${sanitizeTableCell(formatMethodParams(item.params))} | ${sanitizeTableCell(item.introduction)} |\n',
+            '| ${sanitizeTableCell(item.name)} | ${sanitizeTableCell(returnType)} | ${sanitizeTableCell(formatMethodParams(item.params))} | ${sanitizeTableCell(item.introduction == null || item.introduction!.isEmpty ? '-' : item.introduction)} |\n',
           );
         }
       }
