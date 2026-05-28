@@ -3,192 +3,192 @@
 [![Flutter Version](https://img.shields.io/badge/Flutter-%3E%3D3.32.0-blue.svg?logo=flutter)](https://flutter.dev/)
 [![Dart Version](https://img.shields.io/badge/Dart-%3E%3D3.7.0-blue.svg?logo=dart)](https://dart.dev/)
 
-[TDesign Flutter](https://github.com/Tencent/tdesign-flutter) 组件库文档生成工具
+[TDesign Flutter](https://github.com/Tencent/tdesign-flutter) 组件库文档与示例生成工具（基于 smart_cli）。
 
-> 一个用于自动生成 TDesign Flutter 组件库示例代码和 API 文档的命令行工具,基于 smart_cli。
+## 注意事项
 
-## 组件注释规范
+1. **在 `tdesign-component` 根目录执行 `generate`**  
+   `basePath` 指向 component 根目录；在 tools 仓库里直接跑会找不到源码。
 
-### 组件widget注释示例
+2. **只生成 API 时加 `--only-api`**  
+   否则会额外生成 demo 示例文件。
 
-```dart
-/// 组件简介（必须）
+3. **参数说明写在「方法注释」或「字段注释」**  
+   - 静态方法 / 工厂 / 构造：推荐在该方法的 `///` 里写 `[paramName] 说明`。  
+   - 构造参数：也可写在同名字段的 `///` 上。  
+   - 无注释时表格「说明」列为 `-`，属预期，应在源码补全，**不要**在工具里打补丁。
+
+4. **不要把静态方法参数表只写在类简介里**  
+   类注释中的 `## xxx 参数` Markdown 表**不会**回填到方法参数表，方法表仍会显示 `-`。
+
+5. **类简介中的 `**示例**` 代码块不会进入 API 简介**  
+   工具会在输出 `#### 简介` 时自动剥离 `**示例**` 及其后紧随的 `` ``` `` 代码块；示例可保留在源码类注释中。
+
+6. **`library` + `part` 需在 `--name` 中显式列出类型**  
+   例如 popup 的 `TPopupOptions`、`TPopupPlacement` 在 part 文件中，需写入 `--name` 或单独对 part 文件生成。
+
+7. **不对个别组件做特殊兼容**  
+   工具只走通用 AST / dartdoc 规则；注释位置或格式不对，应在 `tdesign-component` 修正。
+
+8. **CI 抽测清单见 `.github/config/tdesign_api.yaml`**  
+   本地 `validate` 与 CI 使用同一配置；`ERROR` 需为 0，`WARN` 多为 enum 成员缺注释等源码问题。
+
+## 快速开始
+
+```bash
+# 环境
+export TOOLS=/path/to/tdesign-flutter-tools
+export COMPONENT=/path/to/tdesign-flutter/tdesign-component
+export TDESIGN_COMPONENT_ROOT=$COMPONENT   # 跑 tools 单元测试时用
+
+cd $TOOLS && dart pub get
 ```
 
-### 组件属性注释示例
+**生成 API（示例：popup）**
 
-```dart
-/// 属性简介（必须）
+```bash
+cd $COMPONENT
+
+dart run $TOOLS/bin/main.dart generate \
+  --folder lib/src/components/popup \
+  --name TPopup,TPopupOptions,TPopupHandle,TPopupPlacement,TPopupTrigger \
+  --folder-name popup \
+  --only-api \
+  --output $TOOLS/tmp-local-preview/popup/
 ```
 
-### 工具职责边界
+**完备性校验（在 tools 仓库根目录）**
 
-工具只负责**通用 AST 解析规则**，不会对个别组件做特殊兼容，也不会修正源码里不合规的注释。
+```bash
+cd $TOOLS
 
-| 由工具负责（通用规则） | 由源码注释负责（需合规编写） |
-| --- | --- |
-| 从构造参数 AST 提取类型、默认值 | 字段/参数的 `///` 说明文案 |
-| 构造参数与公开属性/静态成员分表展示 | 注释内容与字段语义一致（如 content 不应写「标题」） |
-| 过滤 `this.xxx` 被误识别为默认值 | 错别字、遗漏注释、注释写在错误位置 |
-| 解析 `abstract class` 实例方法、工厂构造及参数表 | `super.key` 等场景的类型展示 |
-| 从父类字段解析 `super.xxx` 参数类型 | 无注释时说明列显示 `-`（符合预期） |
-| 不展示库级私有命名构造（`ClassName._`） | 对外文档只保留可调用入口 |
-| 类内章节顺序：静态方法 → 命名工厂 → 默认构造 → 公开属性/成员 | `--name` 列表顺序决定多类型先后；enum/typedef 排在 class 之后 |
-| 同文件内自动收录 public 的 enum / typedef | 也可在 `--name` 中显式指定枚举或别名名称 |
-| folder 模式下检测跨文件重复 enum/typedef 并告警 | 文档保留重复条目以暴露源码问题，工具不做 silent dedupe |
-| Markdown 表格转义、方法参数格式化 | 无注释时说明列显示 `-`（符合预期） |
-| dartdoc 通用处理：`///`/`/** */` 规范化、`[Type]`/`[param]` 引用转 Markdown、方法块内 `[paramName]` 拆入参数表 | 参数说明优先写在对应形参或 `[paramName]` 文档行；已有 Markdown 链接 `[text](url)` 保持原样 |
+dart run bin/main.dart validate \
+  --component-root $COMPONENT \
+  --config .github/config/tdesign_api.yaml
 
-**原则：** 注释不合规导致的文档问题，应在组件源码中补全/修正 `///` 注释，而不是在工具里打补丁。
+# 仅测部分组件
+dart run bin/main.dart validate \
+  --component-root $COMPONENT \
+  --config .github/config/tdesign_api.yaml \
+  --components button,popup
+```
 
-### enum 暴露与注释规范
+## 注释规范
 
-#### 哪些 enum 应该暴露到 API 文档
+### 类 / 字段
 
-满足任一条件即可视为对外 API，应该暴露并维护注释：
+```dart
+/// 组件简介（class / enum / typedef）
+class TFoo { ... }
 
-- 出现在 public 组件/类的构造参数中
-- 出现在 public 方法参数、返回值、属性或回调类型中
-- 用户在示例代码或业务代码中可能直接写出该枚举值
+/// 字段或构造参数说明
+final int count;
+```
 
-如果一个 enum 只是组件内部状态、布局阶段、动画阶段或其他实现细节，不希望出现在文档中，应优先在源码层收敛为私有类型（如 `_InternalPhase`），而不是依赖工具做特殊排除。
+### 静态方法 / 工厂（推荐）
 
-#### public enum 的注释要求
+```dart
+/// 方法简述。
+///
+/// [context] 用于展示浮层。
+/// [options] 配置对象。
+static void show(BuildContext context, {required FooOptions options}) { ... }
+```
 
-- enum 本身应有总说明，解释这组取值的用途
-- enum 成员应补充 `///` 注释；当前工具会将成员说明展示在「枚举值」表中
-- 若成员未写注释，文档说明列会显示 `-`；`validate` 会将其视为源码问题并给出 `source/WARN`
-- 若枚举值本身语义极其直观（如 `small` / `medium` / `large`、`circle` / `square`），可在 enum 前添加普通注释 `// doc-simple-enum`，表示成员说明可省略；该标记不会进入 Flutter / dartdoc 正式文档注释
+dartdoc 引用 `[Type]`、`[param]` 会转为 Markdown 行内代码；已有 Markdown 链接 `[text](url)` 保持原样。
 
-`simple enum` 示例：
+### 命名工厂「通用参数」
+
+多个命名工厂 1:1 透传同一组参数到默认构造时，文档会合并「通用参数」表，各工厂只保留方向独有参数。
+
+### enum
+
+- 对外 API 的 enum 应有类型说明；成员建议写 `///`，否则文档与 `validate` 为 `-` / WARN。
+- 语义极直观的枚举可在 enum 前加 `// doc-simple-enum`，成员表仅列名称且不告警。
 
 ```dart
 // doc-simple-enum
-/// 头像尺寸
-enum TAvatarSize { small, medium, large }
+/// 尺寸
+enum TSize { small, medium, large }
 ```
 
-对于 `simple enum`：
-
-- 文档中的「枚举值」改为仅展示名称，不再渲染整列 `-`
-- `validate` 不再对成员缺少说明发出告警
-- 若成员语义后续变复杂，应移除该标记并补充 `///` 注释
-
-建议优先补齐以下类型的成员说明：
-
-- 行为型：如触发方式、交互模式
-- 状态型：如选中、禁用、加载阶段
-- 位置型：如 top/bottom/left/right
-- 逻辑型：如 single/range/multiple
-
-样式型枚举（如 `primary` / `secondary` / `outline`）即使语义较直观，也建议至少补一条简短说明，避免文档长期出现 `-`。
-
-### 组件demo注释示例
+### demo 示例（生成 demo 页时）
 
 ```dart
-/// demo名称（可以为空，为空的时候默认显示组件名称）
-/// demo示例介绍（可以为空）
+/// demo 名称（可空，默认组件名）
+/// demo 说明（可空）
+```
+
+## 工具能力摘要
+
+| 工具负责 | 源码负责 |
+| --- | --- |
+| 提取类型、默认值；过滤 `this.xxx` 误识别 | 参数 / 字段 `///` 文案 |
+| 静态方法 → 命名工厂 → 默认构造 → 公开属性/成员 | 注释位置、语义正确 |
+| 隐藏 `ClassName._`；dartdoc → Markdown | 无注释时显示 `-` |
+| 同文件收录 public enum/typedef；跨文件重复告警 | `--name` 与 CI 清单一致 |
+| 简介剥离 `**示例**` 代码块 | 不在类简介用表写方法参数 |
+
+## 命令
+
+在 **component 根目录**执行 `generate`：
+
+```bash
+dart run <tools>/bin/main.dart generate [选项]
+```
+
+| 选项 | 说明 |
+| --- | --- |
+| `--file` | 单个组件文件（相对 component 根） |
+| `--folder` | 组件目录 |
+| `--name` | 类型名，逗号分隔 |
+| `--folder-name` | 输出文件名前缀，如 `popup` → `popup_api.md` |
+| `--only-api` | 只生成 API，不生成 demo |
+| `--output` | 输出目录（可用绝对路径写到 tools 仓库外预览） |
+| `--use-grammar` | 使用语法分析（默认词法分析） |
+
+**示例**
+
+```bash
+# 单文件
+dart run bin/main.dart generate \
+  --file lib/src/components/checkbox/t_checkbox.dart \
+  --name TCheckbox --folder-name checkbox --only-api
+
+# 整个目录多类型
+dart run bin/main.dart generate \
+  --folder lib/src/components/dialog \
+  --name TAlertDialog,TConfirmDialog \
+  --folder-name dialog --only-api
+```
+
+**validate**（在 tools 根目录）：
+
+```bash
+dart run bin/main.dart validate \
+  --component-root <tdesign-component> \
+  --config .github/config/tdesign_api.yaml \
+  [--components button,popup]
 ```
 
 ## 本地开发与测试
 
-当 `tdesign-component/pubspec.yaml` 使用 path 依赖指向本仓库时，可在本地直接验证文档生成，无需发布到 git：
+`tdesign-component` 通过 path 依赖本仓库时：
 
 ```bash
-# 1. 确保 component 的 pubspec 已配置：
-#    tdesign_flutter_tools:
-#      path: ../tdesign-flutter-tools
-
-# 2. 在 component 目录解析依赖（需要网络）
-cd ../tdesign-component && dart pub get
-
-# 3. 运行本地测试脚本（picker / calendar / dialog）
-./scripts/local_test.sh picker
+cd tdesign-component && dart pub get
+cd ../tdesign-flutter-tools && ./scripts/local_test.sh picker
 ```
-
-若 `dart pub get` 因网络不可用失败，可临时将 `tdesign-component/.dart_tool/package_config.json` 中
-`tdesign_flutter_tools` 的 `rootUri` 指向本地路径，脚本会通过 `--packages` 跳过联网校验：
 
 ```bash
-./scripts/local_test.sh calendar
+TDESIGN_COMPONENT_ROOT=/path/to/tdesign-component \
+  dart test test/doc_format_test.dart test/static_method_doc_test.dart
 ```
 
-## 组件库工具使用方法
-
-### 初始化工具调用命令
-
-```bash
-dart bin/main.dart generate
-    --file                相对ui_component目录的组件文件路径
-    --folder              相对ui_component目录的组件文件夹路径
-    --name                组件名，多个组件名之间用英文,分割
-    --folder-name         [可选]生成的组件示例文件夹名称,默认生成的文件夹名称是第一个name参数的下划线表示
-    --[no-]only-api       是否只更新api文件
-    --[no-]use-grammar    是否采用语法分析器,默认采用词法分析
-```
-
----
-
-### 一、 初始化命令
-
-初始化命令有以下 3 种使用方式：
-
-1、初始化一个组件文件中的一个组件示例，没有--folder-name的时候，默认文件夹名称是第一个name的下划线表示，示例：
-
-```bash
-dart bin/main.dart generate --file lib/checkbox/custom_check_box.dart --name TECheckBox --folder-name checkbox
-```
-
-2、把一个文件中的多个组件合并生成一份示例数据（api说明生成在一个文件中），没有--folder-name的时候，默认文件夹名称是第一个name的下划线表示
-
-```bash
-dart bin/main.dart generate --file lib/checkbox/custom_check_box.dart --name SquareCheckbox,TECheckBox --folder-name checkbox2
-```
-
-3、把一个文件夹中的多个组件合并生成一份示例数据（api说明生成在一个文件中），没有--folder-name的时候，默认文件夹名称是第一个name的下划线表示
-
-```bash
-dart bin/main.dart generate --folder lib/setting --name SettingItemWidget,SettingTowRowCellWidget,SettingLeftTextCellWidget,SettingCheckBoxCellWidget,SettingTowTextCellWidget,SettingTowLineTextCellWidget,SettingGroupWidget,SettingGroupTextWidget --folder-name setting
-```
-
-如果想只更新API文档，那么在上述初始化的命令之后增加参数 `--only-api` 即可
-
-默认采用词法分析，如果想采用语法分析的方式生成代码，那么在上述初始化的命令之后增加参数 `--use-grammar` 即可
-
-### 二、更新组件示例命令
-
-生成命令行工具
-
-在根目录执行以下命令：
-
-### 编译当前平台的二进制文件
+## 编译可执行文件
 
 ```bash
 dart compile exe bin/main.dart -o demo_tool
 ```
 
-### 编译不同环境的二进制文件
-
-```bash
-# macOS (Intel)
-dart compile exe bin/main.dart -o demo_tool_macos_intel
-
-# macOS (Apple Silicon/M1/M2)
-dart compile exe bin/main.dart -o demo_tool_macos_arm64
-
-# Linux x64
-dart compile exe bin/main.dart -o demo_tool_linux_x64
-
-# Windows x64
-dart compile exe bin/main.dart -o demo_tool_windows_x64.exe
-```
-
-注意：要编译其他平台的二进制文件，需要在对应的平台上运行编译命令，或者使用交叉编译工具。
-
-附录：
-
-生成代码文档
-
-```bash
-flutter pub global run dartdoc:dartdoc
-```
+其它平台需在对应系统上编译，或使用交叉编译工具。
