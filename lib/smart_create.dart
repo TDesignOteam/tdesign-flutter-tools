@@ -360,12 +360,12 @@ class SmartCreator {
       }
       sb.write('### ${apiInfo.componentInfo!.name}');
       final introduction = apiInfo.componentInfo!.introduction ?? '';
-      final String introForSummary =
-          stripExampleSectionForIntroduction(introduction);
+      final String introForSummary = stripIntroductionForApiSummary(introduction);
+      final bool showIntro = commandInfo?.isGetComments ?? false;
       final String kind = apiInfo.componentInfo?.kind ?? 'class';
 
       if (kind == 'enum') {
-        if (introForSummary.isNotEmpty) {
+        if (showIntro && introForSummary.isNotEmpty) {
           sb.write('\n#### 简介\n');
           sb.write(introForSummary);
         }
@@ -415,7 +415,7 @@ class SmartCreator {
       }
 
       if (kind == 'typedef') {
-        if (introForSummary.isNotEmpty) {
+        if (showIntro && introForSummary.isNotEmpty) {
           sb.write('\n#### 简介\n');
           sb.write(introForSummary);
         }
@@ -428,7 +428,7 @@ class SmartCreator {
         continue;
       }
 
-      if (introForSummary.isNotEmpty) {
+      if (showIntro && introForSummary.isNotEmpty) {
         sb.write('\n#### 简介\n');
         sb.write(introForSummary);
       }

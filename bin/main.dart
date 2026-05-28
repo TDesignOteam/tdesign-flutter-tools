@@ -24,7 +24,11 @@ class CreateCommand extends Command {
     argParser.addOption('output', help: '文件输出路径');
     argParser.addFlag('only-api', defaultsTo: false, help: '是否只生成api文件');
     argParser.addFlag('use-grammar', defaultsTo: false, help: '是否采用语法分析器,默认采用词法分析');
-    argParser.addFlag('get-comments', defaultsTo: false, help: '是否获取类的注释');
+    argParser.addFlag(
+      'get-comments',
+      defaultsTo: false,
+      help: '输出类的 #### 简介（剥离 **示例** 与代码块）；不加则仅生成参数表等结构',
+    );
   }
 
   CommandInfo getCommandInfo() {
