@@ -30,10 +30,11 @@ components:
     folder_name: popup
     source_folder: lib/src/components/popup
     classes:
-      - TSlidePopupRoute
-      - TPopupBottomDisplayPanel
-      - TPopupBottomConfirmPanel
-      - TPopupCenterPanel
+      - TPopup
+      - TPopupOptions
+      - TPopupHandle
+      - TPopupPlacement
+      - TPopupTrigger
 
   dialog:
     folder_name: dialog
