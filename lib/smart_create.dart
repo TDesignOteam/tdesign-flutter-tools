@@ -65,7 +65,7 @@ class SmartCreator {
         print(pen('输入的文件夹路径不对: $fullPath'));
       }
     }
-  int startTime = DateTime.now().microsecondsSinceEpoch;
+    int startTime = DateTime.now().microsecondsSinceEpoch;
     // print('${DateTime.now().toLocal()}  AnalysisContextCollection');]
     var sb = StringBuffer();
     files.forEach((element) {
@@ -78,22 +78,27 @@ class SmartCreator {
       print(pen('Detected Dart SDK: $sdkPath'));
     } else {
       AnsiPen pen = AnsiPen()..yellow(bold: true);
-      print(pen('Warning: Could not auto-detect Dart SDK. Analyzer may fail in compiled binary.'));
+      print(
+        pen(
+          'Warning: Could not auto-detect Dart SDK. Analyzer may fail in compiled binary.',
+        ),
+      );
     }
 
     // If sdkPath is not found, omit sdkPath and let the analyzer attempt default discovery (may fail for compiled exe).
-    AnalysisContextCollection analysisContextCollection = (sdkPath != null && sdkPath.isNotEmpty)
-        ? AnalysisContextCollection(
-            includedPaths: files,
-            excludedPaths: [],
-            resourceProvider: PhysicalResourceProvider.INSTANCE,
-            sdkPath: sdkPath,
-          )
-        : AnalysisContextCollection(
-            includedPaths: files,
-            excludedPaths: [],
-            resourceProvider: PhysicalResourceProvider.INSTANCE,
-          );
+    AnalysisContextCollection analysisContextCollection =
+        (sdkPath != null && sdkPath.isNotEmpty)
+            ? AnalysisContextCollection(
+              includedPaths: files,
+              excludedPaths: [],
+              resourceProvider: PhysicalResourceProvider.INSTANCE,
+              sdkPath: sdkPath,
+            )
+            : AnalysisContextCollection(
+              includedPaths: files,
+              excludedPaths: [],
+              resourceProvider: PhysicalResourceProvider.INSTANCE,
+            );
     return analyseFile(analysisContextCollection, files, startTime);
   }
 
@@ -110,9 +115,13 @@ class SmartCreator {
     }
 
     // 2) flutter env
-    final flutterRoot = Platform.environment['FLUTTER_ROOT'] ?? Platform.environment['FLUTTER_HOME'];
+    final flutterRoot =
+        Platform.environment['FLUTTER_ROOT'] ??
+        Platform.environment['FLUTTER_HOME'];
     if (flutterRoot != null && flutterRoot.isNotEmpty) {
-      final candidate = normalize(join(flutterRoot, 'bin', 'cache', 'dart-sdk'));
+      final candidate = normalize(
+        join(flutterRoot, 'bin', 'cache', 'dart-sdk'),
+      );
       if (Directory(candidate).existsSync()) return candidate;
     }
 
@@ -128,7 +137,9 @@ class SmartCreator {
             final binDir = dirname(dartExe);
             final parent = dirname(binDir);
             // check for flutter cached sdk
-            final flutterCache = normalize(join(parent, 'bin', 'cache', 'dart-sdk'));
+            final flutterCache = normalize(
+              join(parent, 'bin', 'cache', 'dart-sdk'),
+            );
             if (Directory(flutterCache).existsSync()) return flutterCache;
             // check for lib/_internal
             final internal = normalize(join(parent, 'lib', '_internal'));
@@ -173,7 +184,11 @@ class SmartCreator {
     return null;
   }
 
-  Future<void> analyseFile(AnalysisContextCollection analysisContextCollection, List<String> paths, int startTime) async {
+  Future<void> analyseFile(
+    AnalysisContextCollection analysisContextCollection,
+    List<String> paths,
+    int startTime,
+  ) async {
     // print('${DateTime.now().toLocal()}  analyseFile');
     List<ParsedComponentInfoInfo> parsedComponentInfoList = [];
     for (final String filePath in paths) {
@@ -183,12 +198,18 @@ class SmartCreator {
       ResolvedUnitResult? unit2;
       if (isGrammarParser!) {
         // 在新版本的analyzer中，getResolvedUnit方法返回的是SomeResolvedUnitResult
-        var result = await analysisContextCollection.contextFor(normalizedPath).currentSession.getResolvedUnit(normalizedPath);
+        var result = await analysisContextCollection
+            .contextFor(normalizedPath)
+            .currentSession
+            .getResolvedUnit(normalizedPath);
         // 将SomeResolvedUnitResult转换为ResolvedUnitResult
         unit2 = result as ResolvedUnitResult?;
       } else {
         // 在新版本的analyzer中，getParsedUnit方法返回的是SomeParsedUnitResult
-        var result = analysisContextCollection.contextFor(normalizedPath).currentSession.getParsedUnit(normalizedPath);
+        var result = analysisContextCollection
+            .contextFor(normalizedPath)
+            .currentSession
+            .getParsedUnit(normalizedPath);
         // 将SomeParsedUnitResult转换为ParsedUnitResult
         unit = result as ParsedUnitResult?;
       }
@@ -204,7 +225,9 @@ class SmartCreator {
         sourceFileName: basename(filePath),
       );
       int endTime = DateTime.now().microsecondsSinceEpoch;
-      print('${isGrammarParser! ? "语法分析" : "词法分析"}执行用时: ${((endTime - startTime) / 1000).floor()}ms');
+      print(
+        '${isGrammarParser! ? "语法分析" : "词法分析"}执行用时: ${((endTime - startTime) / 1000).floor()}ms',
+      );
       // print('${DateTime.now().toLocal()}  开始解析 ${basename(filePath)}');
 
       List<ParsedComponentInfoInfo> items = issuesInFile.analyse();
@@ -221,7 +244,10 @@ class SmartCreator {
     });
     await generateApiInfoFile(parsedComponentInfoList);
     if (!onlyApi! && parsedComponentInfoList.isNotEmpty) {
-      await generateBaseInfoFile(parsedComponentInfoList.first.componentInfo!, commandInfo!);
+      await generateBaseInfoFile(
+        parsedComponentInfoList.first.componentInfo!,
+        commandInfo!,
+      );
       await generateDemoFile(parsedComponentInfoList.first.componentInfo);
       await copyCoverFile(parsedComponentInfoList.first.componentInfo);
     }
@@ -230,7 +256,9 @@ class SmartCreator {
   }
 
   // 生成 api 信息文件
-  Future<void> generateApiInfoFile(List<ParsedComponentInfoInfo> parsedComponentInfoList) async {
+  Future<void> generateApiInfoFile(
+    List<ParsedComponentInfoInfo> parsedComponentInfoList,
+  ) async {
     int startTime = DateTime.now().microsecondsSinceEpoch;
     String? destName = CamelToUnderline(nameList!.first);
     if (folderName != null && folderName!.isNotEmpty) {
@@ -256,12 +284,12 @@ class SmartCreator {
         }
       }
       if (apiInfo.propertyList.isNotEmpty) {
-
         // 填充introduction
         apiInfo.propertyList.forEach((element) {
-          if(element.introduction.isEmpty){
+          if (element.introduction.isEmpty) {
             element.type = apiInfo.fieldMap[element.name]?.type ?? '';
-            element.introduction = apiInfo.fieldMap[element.name]?.introduction ?? '';
+            element.introduction =
+                apiInfo.fieldMap[element.name]?.introduction ?? '';
           }
         });
         sb.write('\n#### 默认构造方法');
@@ -269,46 +297,72 @@ class SmartCreator {
 | 参数 | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- |\n''');
         for (final item in apiInfo.propertyList) {
-          sb.write('''| ${item.name} | ${item.type} | ${item.defaultValue} | ${item.introduction} |\n''');
+          sb.write(
+            '''| ${item.name} | ${item.type} | ${item.defaultValue} | ${item.introduction} |\n''',
+          );
         }
       }
-      if(apiInfo.componentInfo?.constructorMethodList.isNotEmpty ?? false){
+      if (apiInfo.componentInfo?.constructorMethodList.isNotEmpty ?? false) {
         sb.write("\n\n");
         sb.write("#### 工厂构造方法");
         sb.write('''\n
 | 名称  | 说明 |
 | --- |  --- |\n''');
         // 按照方法名称的首字母排序
-        apiInfo.componentInfo!.constructorMethodList.sort((a, b) => a.name!.toLowerCase().compareTo(b.name!.toLowerCase()));
+        apiInfo.componentInfo!.constructorMethodList.sort(
+          (a, b) => a.name!.toLowerCase().compareTo(b.name!.toLowerCase()),
+        );
         for (final item in apiInfo.componentInfo!.constructorMethodList) {
-          sb.write('''| ${apiInfo.componentInfo!.name}.${item.name}  | ${item.introduction} |\n''');
+          sb.write(
+            '''| ${apiInfo.componentInfo!.name}.${item.name}  | ${item.introduction} |\n''',
+          );
         }
       }
-      if(apiInfo.componentInfo?.staticMethodList.isNotEmpty ?? false){
+      if (apiInfo.componentInfo?.staticMethodList.isNotEmpty ?? false) {
         sb.write("\n\n");
         sb.write("#### 静态方法");
-        sb.write('''\n
-| 名称 | 返回类型 | 参数 | 说明 |
-| --- | --- | --- | --- |\n''');
         // 按照方法名称的首字母排序
-        apiInfo.componentInfo!.staticMethodList.sort((a, b) => a.name!.toLowerCase().compareTo(b.name!.toLowerCase()));
+        apiInfo.componentInfo!.staticMethodList.sort(
+          (a, b) => a.name!.toLowerCase().compareTo(b.name!.toLowerCase()),
+        );
         for (final item in apiInfo.componentInfo!.staticMethodList) {
-          StringBuffer paramsSb = StringBuffer();
-          item.params.forEach((element) {
-            paramsSb.write("  ${element.isRequired ? "required " : ""}${element.type} ${element.name},");
-          });
-          sb.write('''| ${item.name} | ${item.returnType == "null" ? "" : item.returnType} | ${paramsSb.toString()} | ${item.introduction?.replaceAll("\n", "  ")} |\n''');
+          sb.write('''\n
+##### ${item.name}
+
+| 名称 | 返回类型 | 说明 |
+| --- | --- | --- |
+| ${item.name} | ${item.returnType == "null" ? "" : item.returnType} | ${item.introduction ?? ""} |
+''');
+          if (item.params.isNotEmpty) {
+            sb.write('''
+| 参数 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+''');
+            for (final param in item.params) {
+              sb.write(
+                '''| ${param.name} | ${param.type} | ${param.defaultValue} | ${param.introduction} |\n''',
+              );
+            }
+          }
+          sb.write('\n');
         }
       }
     }
     await file.writeAsString(sb.toString(), encoding: utf8);
     int endTime = DateTime.now().microsecondsSinceEpoch;
     AnsiPen pen = AnsiPen()..green(bold: true);
-    print(pen('$relativePath 生成完毕!  用时: ${((endTime - startTime) / 1000).floor()}ms'));
+    print(
+      pen(
+        '$relativePath 生成完毕!  用时: ${((endTime - startTime) / 1000).floor()}ms',
+      ),
+    );
   }
 
   // 生成基本信息文件
-  Future<void> generateBaseInfoFile(ComponentInfo componentInfo, CommandInfo commandInfo) async {
+  Future<void> generateBaseInfoFile(
+    ComponentInfo componentInfo,
+    CommandInfo commandInfo,
+  ) async {
     int startTime = DateTime.now().microsecondsSinceEpoch;
     String? destName = getDestFolderName(componentInfo);
     String relativePath = getWidgetDirPath(destName);
@@ -351,9 +405,12 @@ ${componentInfo.introduction}
     await file.writeAsString(fileContent, encoding: utf8);
     int endTime = DateTime.now().microsecondsSinceEpoch;
     AnsiPen pen = AnsiPen()..green(bold: true);
-    print(pen('${join(relativePath, '$destName.md')} 生成完毕!  用时: ${((endTime - startTime) / 1000).floor()}ms'));
+    print(
+      pen(
+        '${join(relativePath, '$destName.md')} 生成完毕!  用时: ${((endTime - startTime) / 1000).floor()}ms',
+      ),
+    );
   }
-
 
   // 生成 demo 示例文件
   Future<void> generateDemoFile(ComponentInfo? componentInfo) async {
@@ -384,7 +441,11 @@ class ${componentInfo!.name}Demo1 extends StatelessWidget {
       await file.writeAsString(fileContent, encoding: utf8);
       int endTime = DateTime.now().microsecondsSinceEpoch;
       AnsiPen pen = AnsiPen()..green(bold: true);
-      print(pen('${join(relativePath, 'demo1.dart')} 生成完毕!  用时: ${((endTime - startTime) / 1000).floor()}ms'));
+      print(
+        pen(
+          '${join(relativePath, 'demo1.dart')} 生成完毕!  用时: ${((endTime - startTime) / 1000).floor()}ms',
+        ),
+      );
     }
   }
 
@@ -416,9 +477,11 @@ class ${componentInfo!.name}Demo1 extends StatelessWidget {
     return destName;
   }
 
-// 指定目标地址
-  String getRelativePath(String? destName) => '${output ?? 'example/assets/api/'}${destName}_api.md';
+  // 指定目标地址
+  String getRelativePath(String? destName) =>
+      '${output ?? 'example/assets/api/'}${destName}_api.md';
 
-// 指定widget生成地址
-  String getWidgetDirPath(String? destName) => '${output ?? 'example/lib/api/widget_group/'}$destName';
+  // 指定widget生成地址
+  String getWidgetDirPath(String? destName) =>
+      '${output ?? 'example/lib/api/widget_group/'}$destName';
 }

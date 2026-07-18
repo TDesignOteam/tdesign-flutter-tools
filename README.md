@@ -1,109 +1,148 @@
 # tdesign_flutter_tools
 
-[![Flutter Version](https://img.shields.io/badge/Flutter-%3E%3D3.32.0-blue.svg?logo=flutter)](https://flutter.dev/)
-[![Dart Version](https://img.shields.io/badge/Dart-%3E%3D3.7.0-blue.svg?logo=dart)](https://dart.dev/)
+[TDesign Flutter](https://github.com/Tencent/tdesign-flutter) component demo and API documentation generator.
 
-[TDesign Flutter](https://github.com/Tencent/tdesign-flutter) 组件库文档生成工具
+The tool is used by `tdesign-component` to generate files such as `example/assets/api/button_api.md` from Dart source comments. The default path uses analyzer AST parsing, so documentation should be written in forms that can be read without full semantic resolution.
 
-> 一个用于自动生成 TDesign Flutter 组件库示例代码和 API 文档的命令行工具,基于 smart_cli。
+## Generate API Docs
 
-## 组件注释规范
+Run from the component package root:
 
-### 组件widget注释示例
+```bash
+flutter pub run tdesign_flutter_tools:main generate \
+  --file lib/src/components/button/t_button.dart \
+  --name TButton,TButtonResolve \
+  --folder-name button \
+  --output example/assets/api/ \
+  --only-api
+```
+
+Use `--folder` instead of `--file` when a component API is split across multiple Dart files:
+
+```bash
+flutter pub run tdesign_flutter_tools:main generate \
+  --folder lib/src/components/tag \
+  --name TTag,TSelectTag,TTagDefaults \
+  --folder-name tag \
+  --output example/assets/api/ \
+  --only-api
+```
+
+Useful flags:
+
+| Flag | Purpose |
+| --- | --- |
+| `--file` | Parse one Dart file. |
+| `--folder` | Parse all files in one folder. |
+| `--name` | Comma-separated public classes to document, in output order. |
+| `--folder-name` | Output API file prefix, for example `button` -> `button_api.md`. |
+| `--output` | Output directory, usually `example/assets/api/`. |
+| `--only-api` | Generate only API markdown. |
+| `--get-comments` | Include class-level introduction text. |
+| `--use-grammar` | Use resolved element parsing. Prefer the default AST path unless semantic types are required. |
+
+## Comment Contract
+
+### Class Comment
+
+Class comments become the component introduction when `--get-comments` is enabled.
 
 ```dart
-/// 组件简介（必须）
+/// Button component.
+class TButton extends StatelessWidget {
+}
 ```
 
-### 组件属性注释示例
+### Constructor Parameters
+
+Constructor parameters can be documented with inline parameter Dartdoc, constructor block `[param]` comments, or field comments for `this.foo` parameters. Inline parameter comments have the highest priority, then `[param]` comments, then field comments.
 
 ```dart
-/// 属性简介（必须）
+class TTextSpan extends TextSpan {
+  /// Creates a TDesign text span.
+  ///
+  /// [text] Text content.
+  TTextSpan({
+    /// Current build context used to resolve theme tokens.
+    BuildContext? context,
+    String? text,
+  });
+}
 ```
 
-### 组件demo注释示例
+Field formal parameters are resolved from their field documentation:
 
 ```dart
-/// demo名称（可以为空，为空的时候默认显示组件名称）
-/// demo示例介绍（可以为空）
+class TButton extends StatelessWidget {
+  const TButton({required this.child});
+
+  /// Button content.
+  final Widget child;
+}
 ```
 
-## 组件库工具使用方法
+### Static Methods
 
-### 初始化工具调用命令
+Static method descriptions should keep the method summary first, followed by one `[param]` line per public parameter. The generated markdown renders a separate parameter table so every parameter has its own description.
+
+```dart
+class TButtonResolve {
+  /// Resolves the final button style.
+  ///
+  /// [variant] Visual variant.
+  /// [colorScheme] Semantic color scheme.
+  /// [disabled] Whether the button is disabled.
+  static ButtonStyle resolve({
+    required TButtonVariant variant,
+    TButtonColorScheme? colorScheme,
+    bool disabled = false,
+  }) {
+    // ...
+  }
+}
+```
+
+### Demo Files
+
+Demo metadata is parsed from class annotations and documentation comments.
+
+```dart
+/// Basic usage
+/// Shows the default state
+@Priority(1)
+class ButtonDemo1 extends StatelessWidget {
+}
+```
+
+## Development
+
+Run all tool tests:
 
 ```bash
-dart bin/main.dart generate
-    --file                相对ui_component目录的组件文件路径
-    --folder              相对ui_component目录的组件文件夹路径
-    --name                组件名，多个组件名之间用英文,分割
-    --folder-name         [可选]生成的组件示例文件夹名称,默认生成的文件夹名称是第一个name参数的下划线表示
-    --[no-]only-api       是否只更新api文件
-    --[no-]use-grammar    是否采用语法分析器,默认采用词法分析
+flutter test
 ```
 
----
-
-### 一、 初始化命令
-
-初始化命令有以下 3 种使用方式：
-
-1、初始化一个组件文件中的一个组件示例，没有--folder-name的时候，默认文件夹名称是第一个name的下划线表示，示例：
+Run with coverage:
 
 ```bash
-dart bin/main.dart generate --file lib/checkbox/custom_check_box.dart --name TECheckBox --folder-name checkbox
+flutter test --coverage
 ```
 
-2、把一个文件中的多个组件合并生成一份示例数据（api说明生成在一个文件中），没有--folder-name的时候，默认文件夹名称是第一个name的下划线表示
+Format changed Dart files before committing:
 
 ```bash
-dart bin/main.dart generate --file lib/checkbox/custom_check_box.dart --name SquareCheckbox,TECheckBox --folder-name checkbox2
+dart format lib test bin
 ```
 
-3、把一个文件夹中的多个组件合并生成一份示例数据（api说明生成在一个文件中），没有--folder-name的时候，默认文件夹名称是第一个name的下划线表示
+The regression tests cover:
 
-```bash
-dart bin/main.dart generate --folder lib/setting --name SettingItemWidget,SettingTowRowCellWidget,SettingLeftTextCellWidget,SettingCheckBoxCellWidget,SettingTowTextCellWidget,SettingTowLineTextCellWidget,SettingGroupWidget,SettingGroupTextWidget --folder-name setting
-```
+| Area | Coverage |
+| --- | --- |
+| Constructor API parsing | Inline parameter docs, `[param]` block docs, field formal fallback, default values. |
+| Static method API parsing | Independent parameter descriptions and AST-only return type extraction. |
+| API markdown rendering | Dedicated static method parameter tables. |
+| Demo parsing | `@Priority`, demo class naming, and comment extraction. |
 
-如果想只更新API文档，那么在上述初始化的命令之后增加参数 `--only-api` 即可
+## Known Direction
 
-默认采用词法分析，如果想采用语法分析的方式生成代码，那么在上述初始化的命令之后增加参数 `--use-grammar` 即可
-
-### 二、更新组件示例命令
-
-生成命令行工具
-
-在根目录执行以下命令：
-
-### 编译当前平台的二进制文件
-
-```bash
-dart compile exe bin/main.dart -o demo_tool
-```
-
-### 编译不同环境的二进制文件
-
-```bash
-# macOS (Intel)
-dart compile exe bin/main.dart -o demo_tool_macos_intel
-
-# macOS (Apple Silicon/M1/M2)
-dart compile exe bin/main.dart -o demo_tool_macos_arm64
-
-# Linux x64
-dart compile exe bin/main.dart -o demo_tool_linux_x64
-
-# Windows x64
-dart compile exe bin/main.dart -o demo_tool_windows_x64.exe
-```
-
-注意：要编译其他平台的二进制文件，需要在对应的平台上运行编译命令，或者使用交叉编译工具。
-
-附录：
-
-生成代码文档
-
-```bash
-flutter pub global run dartdoc:dartdoc
-```
+The next larger refactor should introduce a structured intermediate API model, then render markdown from that model. That will make `generate --check`, strict missing-description failures, and JSON output straightforward without changing component source comments again.
