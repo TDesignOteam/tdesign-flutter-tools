@@ -1,6 +1,8 @@
 import 'dart:io';
 
 import 'package:args/command_runner.dart';
+import 'package:path/path.dart' as p;
+import 'package:tdesign_flutter_tools/api_completeness.dart';
 import 'package:tdesign_flutter_tools/model.dart';
 import 'package:tdesign_flutter_tools/smart_create.dart';
 import 'package:tdesign_flutter_tools/smart_update.dart';
@@ -24,7 +26,11 @@ class CreateCommand extends Command {
     );
     argParser.addOption('output', help: '文件输出路径');
     argParser.addFlag('only-api', defaultsTo: false, help: '是否只生成api文件');
-    argParser.addFlag('get-comments', defaultsTo: false, help: '是否获取类的注释');
+    argParser.addFlag(
+      'get-comments',
+      defaultsTo: false,
+      help: '输出类的 #### 简介（剥离 **示例** 与代码块）；不加则仅生成参数表等结构',
+    );
   }
 
   CommandInfo getCommandInfo() {
@@ -77,6 +83,82 @@ class CreateCommand extends Command {
   }
 }
 
+class ValidateCommand extends Command {
+  @override
+  String name = 'validate';
+
+  @override
+  String description = '校验 API 文档完备性（使用 analyzer AST，与 generate 同一套解析规则）。';
+
+  ValidateCommand() {
+    argParser.addOption(
+      'component-root',
+      help: 'tdesign-component 根目录路径',
+      defaultsTo: '../tdesign-flutter-v1/tdesign-component',
+    );
+    argParser.addOption(
+      'config',
+      help: '审计清单 YAML/JSON 路径',
+      defaultsTo: '.github/config/tdesign_api.yaml',
+    );
+    argParser.addMultiOption(
+      'components',
+      help: '仅检测指定组件，如 button,picker（默认 5 组件全量）',
+    );
+    argParser.addFlag('verbose', abbr: 'v', help: '打印 analyzer 解析过程');
+  }
+
+  @override
+  Future<void> run() async {
+    final String raw = argResults!['component-root'] as String;
+    final String componentRoot =
+        p.isAbsolute(raw)
+            ? p.normalize(raw)
+            : p.normalize(p.join(Directory.current.path, raw));
+    if (!Directory(componentRoot).existsSync()) {
+      stderr.writeln('ERROR: component 目录不存在: $componentRoot');
+      exitCode = 1;
+      return;
+    }
+
+    final String configRaw = argResults!['config'] as String;
+    final String configPath =
+        p.isAbsolute(configRaw)
+            ? p.normalize(configRaw)
+            : p.normalize(p.join(Directory.current.path, configRaw));
+
+    List<ComponentAuditConfig> configs;
+    try {
+      configs = await loadAuditConfigsFromFile(configPath);
+    } catch (e) {
+      stderr.writeln('ERROR: 无法加载配置 $configPath: $e');
+      exitCode = 2;
+      return;
+    }
+
+    final List<String> only =
+        argResults!['components'] as List<String>? ?? <String>[];
+    if (only.isNotEmpty) {
+      final Set<String> wanted = only.toSet();
+      configs =
+          configs
+              .where(
+                (ComponentAuditConfig c) => wanted.contains(c.componentKey),
+              )
+              .toList();
+    }
+
+    final int errors = await runCompletenessAudit(
+      componentRoot: componentRoot,
+      configs: configs,
+      quiet: !(argResults!['verbose'] as bool? ?? false),
+    );
+    if (errors > 0) {
+      exitCode = 1;
+    }
+  }
+}
+
 class UpdateCommand extends Command {
   @override
   String name = 'update';
@@ -111,66 +193,20 @@ class UpdateCommand extends Command {
 }
 
 void main(List<String> arguments) {
-  // generate --file lib/src/components/text/td_text.dart --name TDText --folder-name text --only-api
-  // arguments = [
-  //   'generate',
-  //   '--file',
-  //   '/Users/x/WorkSpace/flutter/tdesign_group/tdesign-flutter/demo_tool/../lib/src/components/text/td_text.dart',
-  //   '--name',
-  //   'TDTextSpan',
-  //   '--folder-name',
-  //   'text',
-  //   '--output',
-  //   '/Users/x/WorkSpace/flutter/tdesign_group/tdesign-flutter/demo_tool/../example/assets/api/',
-  //   '--only-api',
-  //   '--get-comments'
-  // ];
-  // arguments = [
-  //   'generate',
-  //   '--file',
-  //   '/Users/x/WorkSpace/flutter/tdesign_group/tdesign-flutter/demo_tool/../lib/src/components/toast/td_toast.dart',
-  //   '--name',
-  //   'TDToast',
-  //   '--folder-name',
-  //   'toast',
-  //   '--output',
-  //   '/Users/x/WorkSpace/flutter/tdesign_group/tdesign-flutter/demo_tool/../example/assets/api/',
-  //   '--only-api',
-  //   '--get-comments'
-  // ];
-  // arguments = [
-  //   'generate',
-  //   '--folder',
-  //   '/Users/x/WorkSpace/flutter/tdesign_group/tdesign-mobile-flutter/tdesign-component/demo_tool/../lib/src/components/tag',
-  //   '--name',
-  //   'TDTagStyle',
-  //   '--folder-name',
-  //   'tag',
-  //   '--output',
-  //   '/Users/x/WorkSpace/flutter/tdesign_group/tdesign-mobile-flutter/tdesign-component/demo_tool/../example/assets/api2/',
-  //   '--only-api'
-  // ];
+  if (Platform.environment['CI'] != 'true') {
+    final sb = StringBuffer('命令行参数:\n');
+    for (final arg in arguments) {
+      sb.writeln(arg);
+    }
+    print(sb);
+  }
 
-  // generate
-  // --folder
-  // ../lib/src/components/tag
-  // --name
-  // TDTag,TDSelectTag,TDTagStyle
-  // --folder-name
-  // tag
-  // --output
-  // ../example/assets/api/
-  // --only-api
-
-  StringBuffer sb = StringBuffer();
-  sb.writeln("命令行参数:");
-  arguments.forEach((element) {
-    sb.writeln(element);
-  });
-  print(sb);
-
-  CommandRunner('demo', 'Tencent AI Education Component Tools.')
+  CommandRunner(
+      'tdesign_flutter_tools',
+      'TDesign Flutter component documentation tools.',
+    )
     ..addCommand(CreateCommand())
+    ..addCommand(ValidateCommand())
     ..addCommand(UpdateCommand())
     ..run(arguments);
 }

@@ -10,6 +10,7 @@ import 'package:path/path.dart';
 import 'package:analyzer/dart/analysis/results.dart';
 
 import 'component_rule.dart';
+import 'documentation.dart';
 import 'model.dart';
 import 'util.dart';
 
@@ -23,7 +24,6 @@ class SmartCreator {
     this.folderName,
     this.output,
     this.isFileMode,
-    this.isMerge = false,
     this.onlyApi = false,
   });
 
@@ -33,7 +33,6 @@ class SmartCreator {
   final String? folderName; // 文件夹名称
   final String? output; // 输出文件夹名称
   final bool? isFileMode; // 是否是单文件模式
-  final bool isMerge; // 是否合并在一个文件夹中
   final bool? onlyApi;
   final CommandInfo? commandInfo;
 
@@ -98,6 +97,64 @@ class SmartCreator {
               resourceProvider: PhysicalResourceProvider.INSTANCE,
             );
     return analyseFile(analysisContextCollection, files, startTime);
+  }
+
+  /// 仅解析源码（不写入 md），供完备性检测等场景复用与 generate 相同的 AST 规则。
+  Future<List<ParsedComponentInfoInfo>> parseOnly({bool quiet = false}) async {
+    final List<String> files = _collectSourceFiles();
+    if (files.isEmpty) {
+      return <ParsedComponentInfoInfo>[];
+    }
+    final int startTime = DateTime.now().microsecondsSinceEpoch;
+    if (!quiet) {
+      final String? sdkPath = await _detectSdkPath();
+      if (sdkPath != null && sdkPath.isNotEmpty) {
+        AnsiPen pen = AnsiPen()..green(bold: true);
+        print(pen('Detected Dart SDK: $sdkPath'));
+      }
+    }
+    final String? sdkPath = await _detectSdkPath();
+    final AnalysisContextCollection analysisContextCollection =
+        (sdkPath != null && sdkPath.isNotEmpty)
+            ? AnalysisContextCollection(
+              includedPaths: files,
+              excludedPaths: [],
+              resourceProvider: PhysicalResourceProvider.INSTANCE,
+              sdkPath: sdkPath,
+            )
+            : AnalysisContextCollection(
+              includedPaths: files,
+              excludedPaths: [],
+              resourceProvider: PhysicalResourceProvider.INSTANCE,
+            );
+    return _parseComponents(
+      analysisContextCollection,
+      files,
+      startTime,
+      quiet: quiet,
+    );
+  }
+
+  List<String> _collectSourceFiles() {
+    final List<String> files = <String>[];
+    if (isFileMode!) {
+      String filePath = join(basePath!, path);
+      filePath = normalize(filePath);
+      if (File(filePath).existsSync()) {
+        files.add(filePath);
+      }
+    } else {
+      final String fullPath = normalize(join(basePath!, path));
+      final Directory comDir = Directory(fullPath);
+      if (comDir.existsSync()) {
+        for (final FileSystemEntity item in comDir.listSync()) {
+          if (item.path.endsWith('.dart')) {
+            files.add(item.path);
+          }
+        }
+      }
+    }
+    return files;
   }
 
   // Attempt to detect Dart SDK path using multiple strategies:
@@ -182,46 +239,75 @@ class SmartCreator {
     return null;
   }
 
-  Future<void> analyseFile(
+  Future<List<ParsedComponentInfoInfo>> _parseComponents(
     AnalysisContextCollection analysisContextCollection,
     List<String> paths,
-    int startTime,
-  ) async {
-    // print('${DateTime.now().toLocal()}  analyseFile');
-    List<ParsedComponentInfoInfo> parsedComponentInfoList = [];
+    int startTime, {
+    bool quiet = false,
+  }) async {
+    final List<ParsedComponentInfoInfo> parsedComponentInfoList =
+        <ParsedComponentInfoInfo>[];
     for (final String filePath in paths) {
-      print('\n\n${DateTime.now().toLocal()}  开始分析 ${basename(filePath)}');
-      String normalizedPath = normalize(filePath);
+      if (!quiet) {
+        print('\n\n${DateTime.now().toLocal()}  开始分析 ${basename(filePath)}');
+      }
+      final String normalizedPath = normalize(filePath);
       final result = await analysisContextCollection
           .contextFor(normalizedPath)
           .currentSession
           .getParsedUnit(normalizedPath);
       final unit = result as ParsedUnitResult?;
-      ComponentRule issuesInFile = ComponentRule(
+      final ComponentRule issuesInFile = ComponentRule(
         parsedUnitResult: unit,
         nameList: nameList,
         basePath: basePath,
         folderName: folderName,
         startTime: startTime,
-        isMerge: isMerge,
         sourceFileName: basename(filePath),
       );
-      int endTime = DateTime.now().microsecondsSinceEpoch;
-      print('AST分析执行用时: ${((endTime - startTime) / 1000).floor()}ms');
-      // print('${DateTime.now().toLocal()}  开始解析 ${basename(filePath)}');
-
-      List<ParsedComponentInfoInfo> items = issuesInFile.analyse();
-      parsedComponentInfoList.addAll(items);
+      if (!quiet) {
+        final int endTime = DateTime.now().microsecondsSinceEpoch;
+        print('AST分析执行用时: ${((endTime - startTime) / 1000).floor()}ms');
+      }
+      parsedComponentInfoList.addAll(issuesInFile.analyse());
     }
-    // 按照 nameList 的顺序对解析结果进行排序，确保输出顺序与用户输入顺序一致
-    parsedComponentInfoList.sort((a, b) {
+    reportDuplicateAuxiliaryDefinitions(parsedComponentInfoList);
+
+    int kindOrder(ParsedComponentInfoInfo info) {
+      switch (info.componentInfo?.kind) {
+        case 'enum':
+          return 1;
+        case 'typedef':
+          return 2;
+        default:
+          return 0;
+      }
+    }
+
+    parsedComponentInfoList.sort((
+      ParsedComponentInfoInfo a,
+      ParsedComponentInfoInfo b,
+    ) {
+      final int kindCmp = kindOrder(a).compareTo(kindOrder(b));
+      if (kindCmp != 0) {
+        return kindCmp;
+      }
       int indexA = nameList!.indexOf(a.componentInfo!.name!);
       int indexB = nameList!.indexOf(b.componentInfo!.name!);
-      // 找不到的元素排到最后
       if (indexA == -1) indexA = nameList!.length;
       if (indexB == -1) indexB = nameList!.length;
       return indexA.compareTo(indexB);
     });
+    return parsedComponentInfoList;
+  }
+
+  Future<void> analyseFile(
+    AnalysisContextCollection analysisContextCollection,
+    List<String> paths,
+    int startTime,
+  ) async {
+    final List<ParsedComponentInfoInfo> parsedComponentInfoList =
+        await _parseComponents(analysisContextCollection, paths, startTime);
     await generateApiInfoFile(parsedComponentInfoList);
     if (!onlyApi! && parsedComponentInfoList.isNotEmpty) {
       await generateBaseInfoFile(
@@ -249,82 +335,337 @@ class SmartCreator {
     File file = File(path);
     await file.create(recursive: false);
     String fileContent = '''
-## API''';
+## API
+''';
     StringBuffer sb = StringBuffer(fileContent);
     for (final apiInfo in parsedComponentInfoList) {
-      if (parsedComponentInfoList.length > 0) {
-        sb.write('\n');
-        if (parsedComponentInfoList.indexOf(apiInfo) >= 1) {
-          sb.write('''```\n```\n\n''');
-        }
-        sb.write('### ${apiInfo.componentInfo!.name}');
-        if (commandInfo?.isGetComments ?? false) {
-          sb.write('\n#### 简介\n');
-          sb.write('${apiInfo.componentInfo!.introduction}');
-        }
+      if (parsedComponentInfoList.indexOf(apiInfo) >= 1) {
+        sb.write('\n\n');
       }
-      if (apiInfo.propertyList.isNotEmpty) {
-        // 填充introduction
-        apiInfo.propertyList.forEach((element) {
-          if (element.introduction.isEmpty) {
-            element.type = apiInfo.fieldMap[element.name]?.type ?? '';
-            element.introduction =
-                apiInfo.fieldMap[element.name]?.introduction ?? '';
-          }
-        });
-        sb.write('\n#### 默认构造方法');
-        sb.write('''\n
-| 参数 | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- |\n''');
-        for (final item in apiInfo.propertyList) {
-          sb.write(
-            '''| ${item.name} | ${item.type} | ${item.defaultValue} | ${item.introduction} |\n''',
-          );
-        }
-      }
-      if (apiInfo.componentInfo?.constructorMethodList.isNotEmpty ?? false) {
-        sb.write("\n\n");
-        sb.write("#### 工厂构造方法");
-        sb.write('''\n
-| 名称  | 说明 |
-| --- |  --- |\n''');
-        // 按照方法名称的首字母排序
-        apiInfo.componentInfo!.constructorMethodList.sort(
-          (a, b) => a.name!.toLowerCase().compareTo(b.name!.toLowerCase()),
-        );
-        for (final item in apiInfo.componentInfo!.constructorMethodList) {
-          sb.write(
-            '''| ${apiInfo.componentInfo!.name}.${item.name}  | ${item.introduction} |\n''',
-          );
-        }
-      }
-      if (apiInfo.componentInfo?.staticMethodList.isNotEmpty ?? false) {
-        sb.write("\n\n");
-        sb.write("#### 静态方法");
-        // 按照方法名称的首字母排序
-        apiInfo.componentInfo!.staticMethodList.sort(
-          (a, b) => a.name!.toLowerCase().compareTo(b.name!.toLowerCase()),
-        );
-        for (final item in apiInfo.componentInfo!.staticMethodList) {
-          sb.write('''\n
-##### ${item.name}
+      sb.write('### ${apiInfo.componentInfo!.name}');
+      final introduction = apiInfo.componentInfo!.introduction ?? '';
+      final String introForSummary = stripIntroductionForApiSummary(
+        introduction,
+      );
+      final bool showIntro = commandInfo?.isGetComments ?? false;
+      final String kind = apiInfo.componentInfo?.kind ?? 'class';
 
-| 名称 | 返回类型 | 说明 |
-| --- | --- | --- |
-| ${item.name} | ${item.returnType == "null" ? "" : item.returnType} | ${item.introduction ?? ""} |
-''');
-          if (item.params.isNotEmpty) {
-            sb.write('''
-| 参数 | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- |
-''');
-            for (final param in item.params) {
+      if (kind == 'enum') {
+        if (showIntro && introForSummary.isNotEmpty) {
+          sb.write('\n#### 简介\n');
+          sb.write(introForSummary);
+        }
+        final List<EnumMemberInfo> enumMembers =
+            apiInfo.componentInfo!.enumMembers;
+        final bool isSimpleEnum = apiInfo.componentInfo!.isSimpleEnum;
+        if (enumMembers.isNotEmpty) {
+          sb.write('\n#### 枚举值\n');
+          if (isSimpleEnum) {
+            sb.write('''\n
+| 名称 |
+| --- |\n''');
+            for (final EnumMemberInfo member in enumMembers) {
+              sb.write('| ${sanitizeTableCell(member.name)} |\n');
+            }
+          } else {
+            sb.write('''\n
+| 名称 | 说明 |
+| --- | --- |\n''');
+            for (final EnumMemberInfo member in enumMembers) {
+              final String doc =
+                  member.introduction.isEmpty ? '-' : member.introduction;
               sb.write(
-                '''| ${param.name} | ${param.type} | ${param.defaultValue} | ${param.introduction} |\n''',
+                '| ${sanitizeTableCell(member.name)} | ${sanitizeTableCell(doc)} |\n',
               );
             }
           }
-          sb.write('\n');
+        } else if (apiInfo.componentInfo!.enumValues.isNotEmpty) {
+          sb.write('\n#### 枚举值\n');
+          if (isSimpleEnum) {
+            sb.write('''\n
+| 名称 |
+| --- |\n''');
+            for (final String value in apiInfo.componentInfo!.enumValues) {
+              sb.write('| ${sanitizeTableCell(value)} |\n');
+            }
+          } else {
+            sb.write('''\n
+| 名称 | 说明 |
+| --- | --- |\n''');
+            for (final String value in apiInfo.componentInfo!.enumValues) {
+              sb.write('| ${sanitizeTableCell(value)} | - |\n');
+            }
+          }
+        }
+        continue;
+      }
+
+      if (kind == 'typedef') {
+        if (showIntro && introForSummary.isNotEmpty) {
+          sb.write('\n#### 简介\n');
+          sb.write(introForSummary);
+        }
+        if (apiInfo.componentInfo!.typedefDefinition.isNotEmpty) {
+          sb.write('\n#### 类型定义\n\n');
+          sb.write(
+            '```dart\n${apiInfo.componentInfo!.typedefDefinition}\n```\n',
+          );
+        }
+        continue;
+      }
+
+      if (showIntro && introForSummary.isNotEmpty) {
+        sb.write('\n#### 简介\n');
+        sb.write(introForSummary);
+      }
+      StaticMethodInfo? currentMethod;
+
+      void writePropertyTable(
+        List<PropertyInfo> items, {
+        required String header,
+        String nameColumn = '参数',
+      }) {
+        if (items.isEmpty) {
+          return;
+        }
+        sb.write('\n#### $header');
+        sb.write('''\n
+| $nameColumn | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |\n''');
+        for (final PropertyInfo item in items) {
+          sb.write(
+            '''| ${sanitizeTableCell(item.name)} | ${sanitizeTableCell(item.type.isEmpty ? '-' : item.type)} | ${sanitizeTableCell(item.defaultValue)} | ${sanitizeTableCell(item.introduction.isEmpty ? '-' : item.introduction)} |\n''',
+          );
+        }
+      }
+
+      PropertyInfo? resolveForwardedParamInfo(
+        StaticMethodInfo method,
+        PropertyInfo param,
+      ) {
+        final String? targetName = method.forwardedTargetName;
+        final String? targetParamName = method.forwardedParamMap[param.name];
+        if (targetName == null ||
+            targetName.isEmpty ||
+            targetParamName == null ||
+            targetParamName.isEmpty) {
+          return null;
+        }
+        ParsedComponentInfoInfo? targetInfo;
+        for (final ParsedComponentInfoInfo item in parsedComponentInfoList) {
+          if (item.componentInfo?.kind == 'class' &&
+              item.componentInfo?.name == targetName) {
+            targetInfo = item;
+            break;
+          }
+        }
+        if (targetInfo == null) {
+          return null;
+        }
+        final String? constructorName = method.forwardedConstructorName;
+        if (constructorName != null && constructorName.isNotEmpty) {
+          for (final StaticMethodInfo ctor
+              in targetInfo.componentInfo!.constructorMethodList) {
+            if (ctor.name != constructorName) {
+              continue;
+            }
+            for (final PropertyInfo item in ctor.params) {
+              if (item.name == targetParamName) {
+                return item;
+              }
+            }
+            return null;
+          }
+          return null;
+        }
+        for (final PropertyInfo item in targetInfo.propertyList) {
+          if (item.name == targetParamName) {
+            return item;
+          }
+        }
+        return targetInfo.fieldMap[targetParamName];
+      }
+
+      void writeMethodParamTable(List<PropertyInfo> params) {
+        if (params.isEmpty) {
+          return;
+        }
+        sb.write('''\n
+| 参数 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |\n''');
+        for (final PropertyInfo param in params) {
+          PropertyInfo? forwardedParam;
+          if (currentMethod != null) {
+            forwardedParam = resolveForwardedParamInfo(currentMethod!, param);
+          }
+          final String type =
+              ((param.type.isEmpty || param.type == '-') &&
+                      forwardedParam != null &&
+                      forwardedParam.type.isNotEmpty &&
+                      forwardedParam.type != '-')
+                  ? forwardedParam.type
+                  : param.type;
+          final String introduction =
+              param.introduction.isEmpty && forwardedParam != null
+                  ? forwardedParam.introduction
+                  : param.introduction;
+          sb.write(
+            '''| ${sanitizeTableCell(param.name)} | ${sanitizeTableCell(type.isEmpty ? '-' : type)} | ${sanitizeTableCell(param.defaultValue)} | ${sanitizeTableCell(introduction.isEmpty ? '-' : introduction)} |\n''',
+          );
+        }
+      }
+
+      void writeMethodDetails(
+        List<StaticMethodInfo> methods, {
+        required String header,
+        bool includeReturnType = false,
+        bool compactCommonForwardedParams = false,
+      }) {
+        if (methods.isEmpty) {
+          return;
+        }
+        sb.write('\n\n#### $header');
+        methods.sort(
+          (StaticMethodInfo a, StaticMethodInfo b) =>
+              a.name!.toLowerCase().compareTo(b.name!.toLowerCase()),
+        );
+        final Set<String> commonForwardedParams = <String>{};
+        if (compactCommonForwardedParams && methods.length > 1) {
+          Set<String>? common;
+          for (final StaticMethodInfo method in methods) {
+            final bool hasForwardedInfo =
+                method.forwardedTargetName == apiInfo.componentInfo!.name &&
+                (method.forwardedConstructorName == null ||
+                    method.forwardedConstructorName!.isEmpty);
+            if (!hasForwardedInfo) {
+              common = <String>{};
+              break;
+            }
+            final Set<String> forwardedCurrent =
+                method.params
+                    .where(
+                      (PropertyInfo param) =>
+                          method.forwardedParamMap[param.name] == param.name,
+                    )
+                    .map((PropertyInfo p) => p.name)
+                    .toSet();
+            common =
+                common == null
+                    ? forwardedCurrent
+                    : common.intersection(forwardedCurrent);
+            if (common.isEmpty) {
+              break;
+            }
+          }
+          if (common != null && common.isNotEmpty) {
+            commonForwardedParams.addAll(common);
+            final List<PropertyInfo> commonParamRows =
+                methods.first.params
+                    .where(
+                      (PropertyInfo param) =>
+                          commonForwardedParams.contains(param.name),
+                    )
+                    .toList()
+                  ..sort(
+                    (PropertyInfo a, PropertyInfo b) =>
+                        a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+                  );
+            currentMethod = methods.first;
+            sb.write('\n\n##### 通用参数');
+            sb.write('\n\n以下参数由各命名工厂统一透传，含义一致：');
+            writeMethodParamTable(commonParamRows);
+          }
+        }
+        for (final StaticMethodInfo item in methods) {
+          currentMethod = item;
+          sb.write(
+            '\n\n##### ${apiInfo.componentInfo!.name}.${sanitizeTableCell(item.name)}',
+          );
+          if (item.introduction != null && item.introduction!.isNotEmpty) {
+            sb.write('\n\n${item.introduction}');
+          }
+          final String returnType =
+              item.returnType == 'null' ? '' : (item.returnType ?? '');
+          if (includeReturnType && returnType.isNotEmpty) {
+            sb.write('\n\n返回类型：`$returnType`');
+          }
+          final List<PropertyInfo> params =
+              commonForwardedParams.isEmpty
+                  ? item.params
+                  : item.params
+                      .where(
+                        (PropertyInfo param) =>
+                            !commonForwardedParams.contains(param.name),
+                      )
+                      .toList();
+          if (commonForwardedParams.isNotEmpty) {
+            sb.write('\n\n其余参数见「通用参数」。');
+          }
+          writeMethodParamTable(params);
+        }
+        currentMethod = null;
+      }
+
+      // 对外 API 优先：命令式入口 → 命名工厂 → 默认构造 → 字段/成员 → 实例方法
+      if (apiInfo.componentInfo?.staticMethodList.isNotEmpty ?? false) {
+        writeMethodDetails(
+          apiInfo.componentInfo!.staticMethodList,
+          header: '静态方法',
+          includeReturnType: true,
+        );
+      }
+      final List<StaticMethodInfo> publicNamedConstructors =
+          apiInfo.componentInfo!.constructorMethodList
+              .where(
+                (StaticMethodInfo method) =>
+                    !isLibraryPrivateNamedConstructor(method.name),
+              )
+              .toList();
+      if (publicNamedConstructors.isNotEmpty) {
+        writeMethodDetails(
+          publicNamedConstructors,
+          header: '工厂构造方法',
+          compactCommonForwardedParams: true,
+        );
+      }
+      if (apiInfo.propertyList.isNotEmpty) {
+        // 用 fieldMap 补全构造参数缺失的类型和说明
+        for (final PropertyInfo element in apiInfo.propertyList) {
+          final PropertyInfo? field = apiInfo.fieldMap[element.name];
+          if (field == null) {
+            continue;
+          }
+          if (element.type.isEmpty || element.type == '-') {
+            element.type = field.type.isNotEmpty ? field.type : element.type;
+          }
+          if (element.introduction.isEmpty) {
+            element.introduction = field.introduction;
+          }
+        }
+        writePropertyTable(apiInfo.propertyList, header: '默认构造方法');
+      }
+      writePropertyTable(
+        apiInfo.extraPropertyList,
+        header: '公开属性',
+        nameColumn: '属性',
+      );
+      writePropertyTable(
+        apiInfo.staticMemberList,
+        header: '静态成员',
+        nameColumn: '名称',
+      );
+      if (apiInfo.componentInfo?.instanceMethodList.isNotEmpty ?? false) {
+        sb.write("\n\n");
+        sb.write("#### 方法");
+        sb.write('''\n
+| 名称 | 返回类型 | 参数 | 说明 |
+| --- | --- | --- | --- |\n''');
+        for (final item in apiInfo.componentInfo!.instanceMethodList) {
+          final returnType =
+              item.returnType == "null" ? "" : (item.returnType ?? "");
+          sb.write(
+            '| ${sanitizeTableCell(item.name)} | ${sanitizeTableCell(returnType)} | ${sanitizeTableCell(formatMethodParams(item.params))} | ${sanitizeTableCell(item.introduction == null || item.introduction!.isEmpty ? '-' : item.introduction)} |\n',
+          );
         }
       }
     }

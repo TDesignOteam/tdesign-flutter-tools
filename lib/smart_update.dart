@@ -24,6 +24,16 @@ class SmartUpdater {
   final List<String> folderNameList;
 
   Future<void> run() async {
+    final groupPath = join(basePath!, 'example/lib/widget_group');
+    if (!Directory(groupPath).existsSync()) {
+      stderr.writeln('ERROR: 未找到 example/lib/widget_group');
+      stderr.writeln('develop 等新结构请在组件目录使用 generate；CI 预览见 .github/scripts/');
+      exit(1);
+    }
+    await _updateFromWidgetGroup();
+  }
+
+  Future<void> _updateFromWidgetGroup() async {
     String groupPath = join(basePath!, 'example/lib/widget_group');
     Directory groupDir = Directory(groupPath);
     List<FileSystemEntity> groupFiles = groupDir.listSync();
@@ -142,19 +152,11 @@ class SmartUpdater {
         }
       }
     }
-    int endTime = DateTime.now().microsecondsSinceEpoch;
-    Debug(
-      '${comDirPath.split("/").last} 组件示例分析完毕 ${demoList.map((e) => e.name).toList().join(" | ")}  用时: ${((endTime - startTime) / 1000).floor()}ms',
-    );
-    // for (final item in demoList) {
-    //   print('$item');
-    // }
     return demoList;
   }
 
   // 迁移demo的code文件
   Future<void> migrateDemoCodeFile(List<DemoInfo> demoList) async {
-    int startTime = DateTime.now().microsecondsSinceEpoch;
     for (final demoInfo in demoList) {
       String destName = CamelToUnderline(demoInfo.name!);
       String fullPath = join(basePath!, 'example/assets/code/$destName.code');
@@ -172,16 +174,11 @@ class SmartUpdater {
       }
       File destFile = File(fullPath);
       await destFile.writeAsString(linesNew.join('\n'));
-      int endTime = DateTime.now().microsecondsSinceEpoch;
-      Debug(
-        '${demoInfo.name} 示例代码迁移成功！ 用时: ${((endTime - startTime) / 1000).floor()}ms',
-      );
     }
   }
 
   // 迁移组件文件
   Future<void> migrateComFiles(String comDirPath) async {
-    int startTime = DateTime.now().microsecondsSinceEpoch;
     Directory comDir = Directory(comDirPath);
     List<FileSystemEntity> files = comDir.listSync();
     for (final item in files) {
@@ -191,17 +188,13 @@ class SmartUpdater {
         File comMarkdownFile = item as File;
         String relativePath = 'example/assets/doc/$filename';
         await comMarkdownFile.copy(join(basePath!, relativePath));
-        Debug('$relativePath 组件介绍文档更新成功');
       } else if (filename.endsWith('.png')) {
         // 迁移组件封面图
         File comPreviewFile = item as File;
         String relativePath = 'example/assets/preview/$filename';
         await comPreviewFile.copy(join(basePath!, relativePath));
-        Debug('$relativePath 组件封面图更新成功');
       }
     }
-    int endTime = DateTime.now().microsecondsSinceEpoch;
-    Debug('组件文档迁移完毕! 用时: ${((endTime - startTime) / 1000).floor()}ms');
   }
 
   Future<ComponentInfo> getComponentInfo(String comDirPath) async {
@@ -304,7 +297,6 @@ class SmartUpdater {
     List<String> componentGroupList = [];
     Set<String?> displayGroupList =
         componentConfig.componentList!.map((e) => e.group).toSet();
-    Debug('全部分类：$displayGroupList');
     for (final groupType in displayGroupList) {
       List<String> componentInfoList = [];
       if (componentConfig.componentList!.isNotEmpty) {

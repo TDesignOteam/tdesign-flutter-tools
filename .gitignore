@@ -1,4 +1,5 @@
 # Miscellaneous
+.tmp-*/
 *.class
 *.log
 *.pyc
@@ -30,6 +31,13 @@
 .pub/
 build/
 .codebuddy/plans
+
+# 本地 dart compile exe 产物（CI 构建 / README 编译命令）
+/api_tool*
+/demo_tool
+/demo_tool_*
+/demo_tool_*.exe
+*.exe
 
 # Android related
 **/android/**/gradle-wrapper.jar
@@ -74,3 +82,5 @@ build/
 !**/ios/**/default.mode2v3
 !**/ios/**/default.pbxuser
 !**/ios/**/default.perspectivev3
+
+.tmp
