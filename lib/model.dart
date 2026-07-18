@@ -5,13 +5,15 @@ class ComponentConfig {
   ComponentConfig();
 
   factory ComponentConfig.fromJson(Map<String, dynamic> json) {
-    return ComponentConfig()..componentList = (json['componentList'] as List?)?.map((e) => ComponentInfo.fromJson(e as Map<String, dynamic>)).toList();
+    return ComponentConfig()
+      ..componentList =
+          (json['componentList'] as List?)
+              ?.map((e) => ComponentInfo.fromJson(e as Map<String, dynamic>))
+              .toList();
   }
 
   Map<String, dynamic> toJson() {
-    return <String, dynamic>{
-      'componentList': componentList,
-    };
+    return <String, dynamic>{'componentList': componentList};
   }
 
   // 组件信息
@@ -29,7 +31,10 @@ class ComponentInfo {
       ..owner = json['owner'] as String?
       ..group = json['group'] as String?
       ..introduction = json['introduction'] as String?
-      ..demoList = ((json['demoList'] ?? []) as List).map((e) => DemoInfo.fromJson(e as Map<String, dynamic>)).toList();
+      ..demoList =
+          ((json['demoList'] ?? []) as List)
+              .map((e) => DemoInfo.fromJson(e as Map<String, dynamic>))
+              .toList();
   }
 
   //组件的简介
@@ -169,7 +174,7 @@ class PropertyInfo {
 class ParsedComponentInfoInfo {
   ComponentInfo? componentInfo;
   late List<PropertyInfo> propertyList;
-  late Map<String,PropertyInfo> fieldMap;
+  late Map<String, PropertyInfo> fieldMap;
 }
 
 // 用户执行的命令
@@ -180,12 +185,12 @@ class CommandInfo {
   String? folderName = '';
   String? output = '';
   bool isOnlyApi = false;
-  bool isUseGrammar = false;
   bool isGetComments = false;
 
   // 命令是否有效
   bool isValid() {
-    return (file != null && file!.isNotEmpty) || (folder != null && folder!.isNotEmpty);
+    return (file != null && file!.isNotEmpty) ||
+        (folder != null && folder!.isNotEmpty);
   }
 
   bool isFileMode() {
@@ -217,7 +222,6 @@ class CommandInfo {
     sb.write('folderName: $folderName\n');
     sb.write('output: $output\n');
     sb.write('isOnlyApi: $isOnlyApi\n');
-    sb.write('isUseGrammar: $isUseGrammar\n');
     sb.write('widgetNames: $widgetNames\n');
     return sb.toString();
   }

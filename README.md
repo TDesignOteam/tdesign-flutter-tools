@@ -2,7 +2,7 @@
 
 [TDesign Flutter](https://github.com/Tencent/tdesign-flutter) component demo and API documentation generator.
 
-The tool is used by `tdesign-component` to generate files such as `example/assets/api/button_api.md` from Dart source comments. The default path uses analyzer AST parsing, so documentation should be written in forms that can be read without full semantic resolution.
+The tool is used by `tdesign-component` to generate files such as `example/assets/api/button_api.md` from Dart source comments. It now uses one AST parsing path only, so documentation should be written in forms that can be read without full semantic resolution.
 
 ## Generate API Docs
 
@@ -39,7 +39,6 @@ Useful flags:
 | `--output` | Output directory, usually `example/assets/api/`. |
 | `--only-api` | Generate only API markdown. |
 | `--get-comments` | Include class-level introduction text. |
-| `--use-grammar` | Use resolved element parsing. Prefer the default AST path unless semantic types are required. |
 
 ## Comment Contract
 

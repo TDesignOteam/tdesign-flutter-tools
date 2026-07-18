@@ -1,8 +1,6 @@
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
-import 'package:analyzer/dart/element/element.dart';
-import 'package:analyzer/dart/element/visitor.dart';
 import 'package:collection/collection.dart';
 
 import 'model.dart';
@@ -128,9 +126,7 @@ PropertyInfo _propertyFromParameter(
 // ignore_for_file: always_specify_types
 class ComponentRule {
   ComponentRule({
-    this.isGrammarParser,
     this.parsedUnitResult,
-    this.resolvedUnitResult,
     this.startTime,
     this.nameList,
     this.basePath,
@@ -140,44 +136,29 @@ class ComponentRule {
   });
 
   final ParsedUnitResult? parsedUnitResult; //词法分析
-  final ResolvedUnitResult? resolvedUnitResult; //语法分析
   final List<String>? nameList;
   final String? basePath;
   final String? folderName;
   final String? sourceFileName;
   final int? startTime;
   final bool? isMerge;
-  final bool? isGrammarParser;
 
   List<ParsedComponentInfoInfo> analyse() {
     List<ParsedComponentInfoInfo> parsedComponentInfoList = [];
     int startTime1 = DateTime.now().microsecondsSinceEpoch;
-    if (isGrammarParser!) {
-      final ComponentVisitor visitor = ComponentVisitor(
-        nameList: nameList,
-        basePath: basePath,
-        onParsedComponentInfoInfo: (ParsedComponentInfoInfo info) {
-          parsedComponentInfoList.add(info);
-          // print('添加解析结果：${info.componentInfo.name}');
-        },
-        sourceFileName: sourceFileName,
-      );
-      resolvedUnitResult!.libraryElement.accept(visitor);
-    } else {
-      final ComponentAstVisitor visitor = ComponentAstVisitor(
-        nameList: nameList,
-        basePath: basePath,
-        folderName: folderName,
-        onParsedComponentInfoInfo: (ParsedComponentInfoInfo info) {
-          parsedComponentInfoList.add(info);
-          Debug.red('添加解析结果：${info.componentInfo!.name}');
-        },
-        sourceFileName: sourceFileName,
-      );
-      parsedUnitResult!.unit.accept(visitor);
-    }
+    final ComponentAstVisitor visitor = ComponentAstVisitor(
+      nameList: nameList,
+      basePath: basePath,
+      folderName: folderName,
+      onParsedComponentInfoInfo: (ParsedComponentInfoInfo info) {
+        parsedComponentInfoList.add(info);
+        Debug.red('添加解析结果：${info.componentInfo!.name}');
+      },
+      sourceFileName: sourceFileName,
+    );
+    parsedUnitResult!.unit.accept(visitor);
     // int endTime1 = DateTime.now().microsecondsSinceEpoch;
-    // print('语法分析完毕!  用时: ${((endTime1 - startTime1) / 1000).floor()}ms');
+    // print('分析完毕!  用时: ${((endTime1 - startTime1) / 1000).floor()}ms');
     // analysisResult.unit.accept(visitor);
 
     int endTime = DateTime.now().microsecondsSinceEpoch;
@@ -399,123 +380,5 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
       componentInfo ??= ComponentInfo();
       componentInfo!.staticMethodList.add(staticMethodInfo);
     }
-  }
-}
-
-class ComponentVisitor extends RecursiveElementVisitor<void> {
-  ComponentVisitor({
-    this.onParsedComponentInfoInfo,
-    this.nameList,
-    this.basePath,
-    this.folderName,
-    this.sourceFileName,
-  });
-
-  final List<String>? nameList;
-  final String? basePath;
-  final String? folderName;
-  final String? sourceFileName;
-  final OnParsedComponentInfoInfo? onParsedComponentInfoInfo;
-
-  @override
-  void visitClassElement(ClassElement element) {
-    element.visitChildren(this);
-    // print('分析文件：$sourceFileName  ${element.displayName}');
-    if (nameList!.contains(element.displayName)) {
-      ComponentInfo componentInfo = parseBaseInfo(element);
-      List<PropertyInfo> propertyList = parseApiInfo(element);
-      if (onParsedComponentInfoInfo != null) {
-        onParsedComponentInfoInfo!(
-          ParsedComponentInfoInfo()
-            ..componentInfo = componentInfo
-            ..propertyList = propertyList,
-        );
-      }
-    }
-  }
-
-  // 解析基本信息
-  ComponentInfo parseBaseInfo(ClassElement element) {
-    ComponentInfo componentInfo = ComponentInfo();
-    componentInfo.name = element.displayName;
-    List<String> comments = [];
-    if (element.documentationComment != null) {
-      comments = element.documentationComment!.split('///');
-    }
-    for (final String item in comments) {
-      if (item.trim().isNotEmpty) {
-        // print('注解：$item');
-        if (componentInfo.introduction!.isNotEmpty) {
-          componentInfo.introduction = '${componentInfo.introduction}  \n';
-        }
-        componentInfo.introduction =
-            '${componentInfo.introduction}${item.trim()}';
-      }
-    }
-    // print('\n组件基本信息：');
-    // print('$componentInfo');
-    return componentInfo;
-  }
-
-  // 解析属性信息
-  List<PropertyInfo> parseApiInfo(ClassElement element) {
-    List<PropertyInfo> propertyList = [];
-    final parameters = element.unnamedConstructor!.parameters;
-    for (final param in parameters) {
-      PropertyInfo item = PropertyInfo();
-      item.name = param.name;
-      item.type = param.type.toString().replaceAll('*', '');
-      item.isRequired =
-          param.hasRequired ||
-          param.isRequiredNamed ||
-          param.isRequiredPositional;
-      item.isNamed = param.isNamed;
-      String? description = getDescription(param.name, element.fields);
-      if (description != null) {
-        item.introduction = description;
-      }
-      if (param.defaultValueCode != null) {
-        item.defaultValue = getDefaultValue(param);
-      }
-      propertyList.add(item);
-    }
-    // print('\n组件属性信息：');
-    // for (final item in propertyList) {
-    //   print(item);
-    // }
-
-    // 按照属性名称的首字母排序
-    propertyList.sort(
-      (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
-    );
-
-    return propertyList;
-  }
-
-  String getDefaultValue(ParameterElement param) {
-    bool paramIsString =
-        param.type.getDisplayString(withNullability: false) == 'String';
-    String defaultValue = param.defaultValueCode!;
-    // if (defaultValue == '\'\'') {
-    //   defaultValue = '""';
-    // }
-    if (defaultValue.startsWith("'")) {
-      defaultValue = defaultValue.substring(1, defaultValue.length - 1);
-    }
-    // print('paramIsString=$paramIsString, defaultValue=$defaultValue');
-    return paramIsString ? defaultValue : '$defaultValue';
-  }
-
-  String? getDescription(String name, List<FieldElement> fields) {
-    final hasField = fields.any((field) => field.name == name);
-    if (hasField) {
-      final field = fields.firstWhere((element) => element.name == name);
-      final hasDocumentation = field.documentationComment != null;
-
-      return hasDocumentation
-          ? removeDocumentationComment(field.documentationComment!)
-          : null;
-    }
-    return null;
   }
 }

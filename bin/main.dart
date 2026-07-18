@@ -18,10 +18,12 @@ class CreateCommand extends Command {
     argParser.addOption('file', help: '相对ui_component目录的组件文件路径');
     argParser.addOption('folder', help: '相对ui_component目录的组件文件夹路径');
     argParser.addOption('name', help: '组件名，多个组件名之间用英文,分割');
-    argParser.addOption('folder-name', help: '[可选]生成的组件示例文件夹名称,默认文件夹名称是第一项name的下划线表示');
+    argParser.addOption(
+      'folder-name',
+      help: '[可选]生成的组件示例文件夹名称,默认文件夹名称是第一项name的下划线表示',
+    );
     argParser.addOption('output', help: '文件输出路径');
     argParser.addFlag('only-api', defaultsTo: false, help: '是否只生成api文件');
-    argParser.addFlag('use-grammar', defaultsTo: false, help: '是否采用语法分析器,默认采用词法分析');
     argParser.addFlag('get-comments', defaultsTo: false, help: '是否获取类的注释');
   }
 
@@ -38,8 +40,6 @@ class CreateCommand extends Command {
     commandInfo.output = argResults!['output'];
     bool onlyApi = argResults!['only-api'] ?? false;
     commandInfo.isOnlyApi = onlyApi;
-    bool isGrammarParser = argResults!['use-grammar'] ?? false;
-    commandInfo.isUseGrammar = isGrammarParser;
     commandInfo.widgetNames = argResults!['name'].toString();
     commandInfo.isGetComments = argResults!['get-comments'] ?? false;
     return commandInfo;
@@ -60,20 +60,19 @@ class CreateCommand extends Command {
       isFileMode = false;
     }
     bool? onlyApi = argResults!['only-api'];
-    bool? isGrammarParser = argResults!['use-grammar'];
     print('${DateTime.now().toLocal()}  ${argResults!['name']} 正在生成组件文档...');
     // print('原始命令：${getCommandInfo()}');
     SmartCreator creator = SmartCreator(
-        isFileMode: isFileMode,
-        // isMerge: isMerge,
-        onlyApi: onlyApi,
-        nameList: argResults!['name'].toString().split(','),
-        basePath: '${Directory.current.path}/',
-        path: path,
-        output: argResults!['output'],
-        isGrammarParser: isGrammarParser,
-        commandInfo: getCommandInfo(),
-        folderName: folderName);
+      isFileMode: isFileMode,
+      // isMerge: isMerge,
+      onlyApi: onlyApi,
+      nameList: argResults!['name'].toString().split(','),
+      basePath: '${Directory.current.path}/',
+      path: path,
+      output: argResults!['output'],
+      commandInfo: getCommandInfo(),
+      folderName: folderName,
+    );
     await creator.run();
   }
 }
@@ -100,7 +99,9 @@ class UpdateCommand extends Command {
       String folderName = argResults!['folder-name'];
       folderNameList = folderName.split(',');
     }
-    print('${DateTime.now().toLocal()}  正在更新组件示例... ${folderNameList.join("|")}');
+    print(
+      '${DateTime.now().toLocal()}  正在更新组件示例... ${folderNameList.join("|")}',
+    );
     SmartUpdater creator = SmartUpdater(
       basePath: '${Directory.current.path}/',
       folderNameList: folderNameList,

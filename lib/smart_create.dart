@@ -25,7 +25,6 @@ class SmartCreator {
     this.isFileMode,
     this.isMerge = false,
     this.onlyApi = false,
-    this.isGrammarParser = false,
   });
 
   final String? path; //文件相对路径
@@ -36,7 +35,6 @@ class SmartCreator {
   final bool? isFileMode; // 是否是单文件模式
   final bool isMerge; // 是否合并在一个文件夹中
   final bool? onlyApi;
-  final bool? isGrammarParser; //是否使用语法分析器
   final CommandInfo? commandInfo;
 
   Future<void> run() async {
@@ -194,29 +192,13 @@ class SmartCreator {
     for (final String filePath in paths) {
       print('\n\n${DateTime.now().toLocal()}  开始分析 ${basename(filePath)}');
       String normalizedPath = normalize(filePath);
-      ParsedUnitResult? unit;
-      ResolvedUnitResult? unit2;
-      if (isGrammarParser!) {
-        // 在新版本的analyzer中，getResolvedUnit方法返回的是SomeResolvedUnitResult
-        var result = await analysisContextCollection
-            .contextFor(normalizedPath)
-            .currentSession
-            .getResolvedUnit(normalizedPath);
-        // 将SomeResolvedUnitResult转换为ResolvedUnitResult
-        unit2 = result as ResolvedUnitResult?;
-      } else {
-        // 在新版本的analyzer中，getParsedUnit方法返回的是SomeParsedUnitResult
-        var result = analysisContextCollection
-            .contextFor(normalizedPath)
-            .currentSession
-            .getParsedUnit(normalizedPath);
-        // 将SomeParsedUnitResult转换为ParsedUnitResult
-        unit = result as ParsedUnitResult?;
-      }
+      final result = await analysisContextCollection
+          .contextFor(normalizedPath)
+          .currentSession
+          .getParsedUnit(normalizedPath);
+      final unit = result as ParsedUnitResult?;
       ComponentRule issuesInFile = ComponentRule(
         parsedUnitResult: unit,
-        resolvedUnitResult: unit2,
-        isGrammarParser: isGrammarParser,
         nameList: nameList,
         basePath: basePath,
         folderName: folderName,
@@ -225,9 +207,7 @@ class SmartCreator {
         sourceFileName: basename(filePath),
       );
       int endTime = DateTime.now().microsecondsSinceEpoch;
-      print(
-        '${isGrammarParser! ? "语法分析" : "词法分析"}执行用时: ${((endTime - startTime) / 1000).floor()}ms',
-      );
+      print('AST分析执行用时: ${((endTime - startTime) / 1000).floor()}ms');
       // print('${DateTime.now().toLocal()}  开始解析 ${basename(filePath)}');
 
       List<ParsedComponentInfoInfo> items = issuesInFile.analyse();
@@ -385,9 +365,6 @@ class SmartCreator {
     }
     if (commandInfo.isOnlyApi) {
       sb.write('isOnlyApi: ${commandInfo.isOnlyApi}\n');
-    }
-    if (commandInfo.isUseGrammar) {
-      sb.write('isUseGrammar: ${commandInfo.isUseGrammar}\n');
     }
     sb.write('widgetNames: ${commandInfo.widgetNames}');
 

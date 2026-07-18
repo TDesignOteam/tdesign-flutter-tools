@@ -5,7 +5,9 @@ import 'package:ansicolor/ansicolor.dart';
 // 驼峰转下划线
 String CamelToUnderline(String input) {
   RegExp exp = RegExp(r'(?<=[a-z])[A-Z]');
-  return input.replaceAllMapped(exp, (Match m) => ('_' + m.group(0)!)).toLowerCase();
+  return input
+      .replaceAllMapped(exp, (Match m) => ('_' + m.group(0)!))
+      .toLowerCase();
 }
 
 // 移除注释中的///
@@ -26,9 +28,12 @@ bool isValidDemoClass(String className) {
   return regex.hasMatch(className);
 }
 
-bool isEnum(DartType targetType) => targetType is InterfaceType && targetType.element.kind.name == 'ENUM';
+bool isEnum(DartType targetType) =>
+    targetType is InterfaceType && targetType.element.kind.name == 'ENUM';
 
-bool hasType(List<InterfaceType> superTypes, String type) => superTypes.any((superType) => superType.getDisplayString(withNullability: false) == type);
+bool hasType(List<InterfaceType> superTypes, String type) => superTypes.any(
+  (superType) => superType.getDisplayString(withNullability: false) == type,
+);
 
 bool isWidget(List<InterfaceType> superTypes) => hasType(superTypes, 'Widget');
 
