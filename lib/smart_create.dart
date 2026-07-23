@@ -25,7 +25,6 @@ class SmartCreator {
     this.output,
     this.isFileMode,
     this.onlyApi = false,
-    this.isGrammarParser = false,
   });
 
   final String? path; //文件相对路径
@@ -35,7 +34,6 @@ class SmartCreator {
   final String? output; // 输出文件夹名称
   final bool? isFileMode; // 是否是单文件模式
   final bool? onlyApi;
-  final bool? isGrammarParser; //是否使用语法分析器
   final CommandInfo? commandInfo;
 
   Future<void> run() async {
@@ -254,25 +252,13 @@ class SmartCreator {
         print('\n\n${DateTime.now().toLocal()}  开始分析 ${basename(filePath)}');
       }
       final String normalizedPath = normalize(filePath);
-      ParsedUnitResult? unit;
-      ResolvedUnitResult? unit2;
-      if (isGrammarParser!) {
-        final result = await analysisContextCollection
-            .contextFor(normalizedPath)
-            .currentSession
-            .getResolvedUnit(normalizedPath);
-        unit2 = result as ResolvedUnitResult?;
-      } else {
-        final result = analysisContextCollection
-            .contextFor(normalizedPath)
-            .currentSession
-            .getParsedUnit(normalizedPath);
-        unit = result as ParsedUnitResult?;
-      }
+      final result = await analysisContextCollection
+          .contextFor(normalizedPath)
+          .currentSession
+          .getParsedUnit(normalizedPath);
+      final unit = result as ParsedUnitResult?;
       final ComponentRule issuesInFile = ComponentRule(
         parsedUnitResult: unit,
-        resolvedUnitResult: unit2,
-        isGrammarParser: isGrammarParser,
         nameList: nameList,
         basePath: basePath,
         folderName: folderName,
@@ -281,9 +267,7 @@ class SmartCreator {
       );
       if (!quiet) {
         final int endTime = DateTime.now().microsecondsSinceEpoch;
-        print(
-          '${isGrammarParser! ? "语法分析" : "词法分析"}执行用时: ${((endTime - startTime) / 1000).floor()}ms',
-        );
+        print('AST分析执行用时: ${((endTime - startTime) / 1000).floor()}ms');
       }
       parsedComponentInfoList.addAll(issuesInFile.analyse());
     }
@@ -360,7 +344,9 @@ class SmartCreator {
       }
       sb.write('### ${apiInfo.componentInfo!.name}');
       final introduction = apiInfo.componentInfo!.introduction ?? '';
-      final String introForSummary = stripIntroductionForApiSummary(introduction);
+      final String introForSummary = stripIntroductionForApiSummary(
+        introduction,
+      );
       final bool showIntro = commandInfo?.isGetComments ?? false;
       final String kind = apiInfo.componentInfo?.kind ?? 'class';
 
@@ -563,23 +549,27 @@ class SmartCreator {
                     )
                     .map((PropertyInfo p) => p.name)
                     .toSet();
-            common = common == null
-                ? forwardedCurrent
-                : common.intersection(forwardedCurrent);
+            common =
+                common == null
+                    ? forwardedCurrent
+                    : common.intersection(forwardedCurrent);
             if (common.isEmpty) {
               break;
             }
           }
           if (common != null && common.isNotEmpty) {
             commonForwardedParams.addAll(common);
-            final List<PropertyInfo> commonParamRows = methods.first.params
-                .where((PropertyInfo param) => commonForwardedParams.contains(param.name))
-                .toList()
-              ..sort(
-                (PropertyInfo a, PropertyInfo b) => a.name
-                    .toLowerCase()
-                    .compareTo(b.name.toLowerCase()),
-              );
+            final List<PropertyInfo> commonParamRows =
+                methods.first.params
+                    .where(
+                      (PropertyInfo param) =>
+                          commonForwardedParams.contains(param.name),
+                    )
+                    .toList()
+                  ..sort(
+                    (PropertyInfo a, PropertyInfo b) =>
+                        a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+                  );
             currentMethod = methods.first;
             sb.write('\n\n##### 通用参数');
             sb.write('\n\n以下参数由各命名工厂统一透传，含义一致：');
@@ -599,14 +589,15 @@ class SmartCreator {
           if (includeReturnType && returnType.isNotEmpty) {
             sb.write('\n\n返回类型：`$returnType`');
           }
-          final List<PropertyInfo> params = commonForwardedParams.isEmpty
-              ? item.params
-              : item.params
-                    .where(
-                      (PropertyInfo param) =>
-                          !commonForwardedParams.contains(param.name),
-                    )
-                    .toList();
+          final List<PropertyInfo> params =
+              commonForwardedParams.isEmpty
+                  ? item.params
+                  : item.params
+                      .where(
+                        (PropertyInfo param) =>
+                            !commonForwardedParams.contains(param.name),
+                      )
+                      .toList();
           if (commonForwardedParams.isNotEmpty) {
             sb.write('\n\n其余参数见「通用参数」。');
           }
@@ -715,9 +706,6 @@ class SmartCreator {
     }
     if (commandInfo.isOnlyApi) {
       sb.write('isOnlyApi: ${commandInfo.isOnlyApi}\n');
-    }
-    if (commandInfo.isUseGrammar) {
-      sb.write('isUseGrammar: ${commandInfo.isUseGrammar}\n');
     }
     sb.write('widgetNames: ${commandInfo.widgetNames}');
 

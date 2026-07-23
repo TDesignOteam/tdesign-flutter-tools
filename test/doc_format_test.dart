@@ -3,10 +3,7 @@ import 'package:test/test.dart';
 
 void main() {
   test('normalizeDocumentationText trims prose and keeps fence body', () {
-    expect(
-      normalizeDocumentationText('/// 第一行\n/// \n///  第二行'),
-      '第一行\n\n第二行',
-    );
+    expect(normalizeDocumentationText('/// 第一行\n/// \n///  第二行'), '第一行\n\n第二行');
   });
 
   test('formatDartdocReferencesInProse converts bracket references', () {
@@ -57,20 +54,23 @@ final x = [1];
     expect(result.narrative, isNot(contains('[context]')));
   });
 
-  test('parseDocumentation does not merge narrative after same-line param doc', () {
-    const raw = '''
+  test(
+    'parseDocumentation does not merge narrative after same-line param doc',
+    () {
+      const raw = '''
 [options] 浮层配置；推荐 bottom。
 
 返回 Handle，可用 close、open。
 ''';
-    final ParsedDocumentation result = parseDocumentation(
-      raw,
-      parameterNames: <String>['options'],
-    );
-    expect(result.parameterDocs['options'], '浮层配置；推荐 bottom。');
-    expect(result.narrative, contains('返回 Handle'));
-    expect(result.parameterDocs['options'], isNot(contains('返回')));
-  });
+      final ParsedDocumentation result = parseDocumentation(
+        raw,
+        parameterNames: <String>['options'],
+      );
+      expect(result.parameterDocs['options'], '浮层配置；推荐 bottom。');
+      expect(result.narrative, contains('返回 Handle'));
+      expect(result.parameterDocs['options'], isNot(contains('返回')));
+    },
+  );
 
   test('parseDocumentation merges multi-line param docs', () {
     const raw = '''
@@ -82,10 +82,7 @@ final x = [1];
       raw,
       parameterNames: <String>['context'],
     );
-    expect(
-      result.parameterDocs['context'],
-      '用于查找 Navigator。\n第二行说明。',
-    );
+    expect(result.parameterDocs['context'], '用于查找 Navigator。\n第二行说明。');
     expect(result.narrative, isEmpty);
   });
 
@@ -100,10 +97,7 @@ final a = 1;
 
 第二段说明。
 ''';
-    expect(
-      stripIntroductionForApiSummary(raw),
-      '第一段说明。\n\n第二段说明。',
-    );
+    expect(stripIntroductionForApiSummary(raw), '第一段说明。\n\n第二段说明。');
   });
 
   test('stripIntroductionForApiSummary removes standalone fenced blocks', () {

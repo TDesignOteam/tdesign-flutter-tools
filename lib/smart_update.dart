@@ -18,10 +18,7 @@ import 'util.dart';
 
 // ignore_for_file: always_specify_types
 class SmartUpdater {
-  SmartUpdater({
-    this.basePath,
-    this.folderNameList = const [],
-  });
+  SmartUpdater({this.basePath, this.folderNameList = const []});
 
   final String? basePath; // ui_component 目录的路径
   final List<String> folderNameList;
@@ -42,7 +39,8 @@ class SmartUpdater {
     List<FileSystemEntity> groupFiles = groupDir.listSync();
     ComponentConfig componentConfig = ComponentConfig();
     for (final comDir in groupFiles) {
-      if (folderNameList.length > 0 && !folderNameList.contains(comDir.path.split('/').last)) {
+      if (folderNameList.length > 0 &&
+          !folderNameList.contains(comDir.path.split('/').last)) {
         continue;
       }
       if (comDir is Directory) {
@@ -57,12 +55,18 @@ class SmartUpdater {
         ComponentInfo componentInfo = await getComponentInfo(comDir.path);
         int startTime = DateTime.now().microsecondsSinceEpoch;
         if (demoFiles.isNotEmpty) {
-          AnalysisContextCollection analysisContextCollection = AnalysisContextCollection(
-            includedPaths: demoFiles,
-            excludedPaths: [],
-            resourceProvider: PhysicalResourceProvider.INSTANCE,
+          AnalysisContextCollection analysisContextCollection =
+              AnalysisContextCollection(
+                includedPaths: demoFiles,
+                excludedPaths: [],
+                resourceProvider: PhysicalResourceProvider.INSTANCE,
+              );
+          List<DemoInfo> demoList = await analyseFile(
+            analysisContextCollection,
+            demoFiles,
+            startTime,
+            comDir.path,
           );
-          List<DemoInfo> demoList = await analyseFile(analysisContextCollection, demoFiles, startTime, comDir.path);
           await migrateComFiles(comDir.path);
           await migrateDemoCodeFile(demoList);
           componentInfo.demoList!.addAll(demoList);
@@ -71,26 +75,33 @@ class SmartUpdater {
             return a.priority! > b.priority! ? 1 : 0;
           });
         }
-        if (componentInfo.commandInfo != null && componentInfo.commandInfo!.isValid()) {
+        if (componentInfo.commandInfo != null &&
+            componentInfo.commandInfo!.isValid()) {
           bool isFileMode = componentInfo.commandInfo!.isFileMode();
           // AnsiPen pen = AnsiPen()..red(bold: true);
           // print(pen('更新api: ${componentInfo.commandInfo!.getCommand()}'));
           // print(pen('信息：${componentInfo.commandInfo!.toString()}'));
           SmartCreator creator = SmartCreator(
-              isFileMode: isFileMode,
-              onlyApi: true,
-              nameList: componentInfo.commandInfo!.widgetNames!.split(','),
-              basePath: basePath,
-              path: isFileMode ? componentInfo.commandInfo!.file : componentInfo.commandInfo!.folder,
-              isGrammarParser: false,
-              folderName: componentInfo.commandInfo!.folderName);
+            isFileMode: isFileMode,
+            onlyApi: true,
+            nameList: componentInfo.commandInfo!.widgetNames!.split(','),
+            basePath: basePath,
+            path:
+                isFileMode
+                    ? componentInfo.commandInfo!.file
+                    : componentInfo.commandInfo!.folder,
+            folderName: componentInfo.commandInfo!.folderName,
+          );
           await creator.run();
         }
         if (componentInfo.name!.isNotEmpty) {
           int endTime = DateTime.now().microsecondsSinceEpoch;
           AnsiPen pen = AnsiPen()..green(bold: true);
-          print(pen(
-              '更新组件信息 ${componentInfo.name}: 示例 ${componentInfo.demoList!.map((e) => e.name).toList().join("|")}   用时: ${((endTime - startTime) / 1000).floor()}ms'));
+          print(
+            pen(
+              '更新组件信息 ${componentInfo.name}: 示例 ${componentInfo.demoList!.map((e) => e.name).toList().join("|")}   用时: ${((endTime - startTime) / 1000).floor()}ms',
+            ),
+          );
           componentConfig.componentList!.add(componentInfo);
         }
       }
@@ -98,7 +109,12 @@ class SmartUpdater {
     await updateRegisterFile(componentConfig);
   }
 
-  Future<List<DemoInfo>> analyseFile(AnalysisContextCollection analysisContextCollection, List<String> paths, int startTime, String comDirPath) async {
+  Future<List<DemoInfo>> analyseFile(
+    AnalysisContextCollection analysisContextCollection,
+    List<String> paths,
+    int startTime,
+    String comDirPath,
+  ) async {
     // AnsiPen pen = AnsiPen()..green(bold: true);
     // print(pen('analyseFile：$comDirPath'));
 
@@ -106,20 +122,31 @@ class SmartUpdater {
     for (final String filePath in paths) {
       String normalizedPath = normalize(filePath);
       // 在新版本的analyzer中，getParsedUnit方法返回的是SomeParsedUnitResult
-      var result = analysisContextCollection.contextFor(normalizedPath).currentSession.getParsedUnit(normalizedPath);
+      var result = analysisContextCollection
+          .contextFor(normalizedPath)
+          .currentSession
+          .getParsedUnit(normalizedPath);
       // 将SomeParsedUnitResult转换为ParsedUnitResult
       ParsedUnitResult unit = result as ParsedUnitResult;
-      DemoRule issuesInFile = DemoRule(analysisResult: unit, basePath: basePath, filePath: filePath);
+      DemoRule issuesInFile = DemoRule(
+        analysisResult: unit,
+        basePath: basePath,
+        filePath: filePath,
+      );
       DemoInfo demoInfo = issuesInFile.analyse();
       demoInfo.fileName = basename(filePath);
       if (demoInfo.isValid) {
         demoInfo.filePath = filePath;
-        DemoInfo? doubleDemoInfo = demoList.firstWhereOrNull((element) => element.name == demoInfo.name);
+        DemoInfo? doubleDemoInfo = demoList.firstWhereOrNull(
+          (element) => element.name == demoInfo.name,
+        );
         // print('demoList=${demoList.length}, ${demoInfo.name}');
         if (doubleDemoInfo != null) {
           AnsiPen pen = AnsiPen()..red(bold: true);
           String folderName = comDirPath.split('/').last;
-          print(pen('组件示例类名重复：$folderName/${demoInfo.fileName}  ${demoInfo.name}'));
+          print(
+            pen('组件示例类名重复：$folderName/${demoInfo.fileName}  ${demoInfo.name}'),
+          );
         } else if (demoInfo.name!.isNotEmpty) {
           demoList.add(demoInfo);
         }
@@ -128,7 +155,7 @@ class SmartUpdater {
     return demoList;
   }
 
-// 迁移demo的code文件
+  // 迁移demo的code文件
   Future<void> migrateDemoCodeFile(List<DemoInfo> demoList) async {
     for (final demoInfo in demoList) {
       String destName = CamelToUnderline(demoInfo.name!);
@@ -137,7 +164,9 @@ class SmartUpdater {
       List<String> lines = await file.readAsLines();
       List<String> linesNew = [];
       for (int i = 0; i < lines.length; i++) {
-        if (lines[i].contains('@Priority') || lines[i].contains('@DemoItemStyle') || lines[i].contains('///')) {
+        if (lines[i].contains('@Priority') ||
+            lines[i].contains('@DemoItemStyle') ||
+            lines[i].contains('///')) {
           continue;
         } else {
           linesNew.add(lines[i]);
@@ -180,11 +209,12 @@ class SmartUpdater {
       File configFile = markdownFile as File;
       String markdown = await configFile.readAsString();
       var document = md.Document(
-          encodeHtml: false,
-          extensionSet: md.ExtensionSet(
-            md.ExtensionSet.gitHubWeb.blockSyntaxes,
-            [md.EmojiSyntax(), ...md.ExtensionSet.gitHubWeb.inlineSyntaxes],
-          ));
+        encodeHtml: false,
+        extensionSet: md.ExtensionSet(md.ExtensionSet.gitHubWeb.blockSyntaxes, [
+          md.EmojiSyntax(),
+          ...md.ExtensionSet.gitHubWeb.inlineSyntaxes,
+        ]),
+      );
       final List<String> lines = LineSplitter().convert(markdown);
       final List<md.Node> astNodes = document.parseLines(lines);
       bool nextIntroduction = false;
@@ -202,7 +232,10 @@ class SmartUpdater {
             final cItem = item.children!.first;
             // print('\n子节点[${item.children.indexOf(cItem) + 1}/$cLen][${cItem.runtimeType}] ${cItem.textContent}');
             if (cItem is md.Text) {
-              if (cItem.text.contains('group') && cItem.text.contains('name') && cItem.text.contains('subtitle') && cItem.text.contains('owner')) {
+              if (cItem.text.contains('group') &&
+                  cItem.text.contains('name') &&
+                  cItem.text.contains('subtitle') &&
+                  cItem.text.contains('owner')) {
                 List<String> values = cItem.text.split('\n');
                 String group = '';
                 String name = '';
@@ -226,12 +259,14 @@ class SmartUpdater {
                     commandInfo.file = val.replaceAll('file:', '').trim();
                   }
                   if (val.startsWith('folderName')) {
-                    commandInfo.folderName = val.replaceAll('folderName:', '').trim();
+                    commandInfo.folderName =
+                        val.replaceAll('folderName:', '').trim();
                   } else if (val.startsWith('folder')) {
                     commandInfo.folder = val.replaceAll('folder:', '').trim();
                   }
                   if (val.startsWith('widgetNames')) {
-                    commandInfo.widgetNames = val.replaceAll('widgetNames:', '').trim();
+                    commandInfo.widgetNames =
+                        val.replaceAll('widgetNames:', '').trim();
                   }
                 }
                 // print('$name | $group | $subtitle | $owner');
@@ -260,11 +295,16 @@ class SmartUpdater {
   Future<void> updateRegisterFile(ComponentConfig componentConfig) async {
     List<String> importList = [];
     List<String> componentGroupList = [];
-    Set<String?> displayGroupList = componentConfig.componentList!.map((e) => e.group).toSet();
+    Set<String?> displayGroupList =
+        componentConfig.componentList!.map((e) => e.group).toSet();
     for (final groupType in displayGroupList) {
       List<String> componentInfoList = [];
       if (componentConfig.componentList!.isNotEmpty) {
-        List<ComponentInfo> comList = componentConfig.componentList?.where((element) => element.group == groupType).toList() ?? [];
+        List<ComponentInfo> comList =
+            componentConfig.componentList
+                ?.where((element) => element.group == groupType)
+                .toList() ??
+            [];
         for (final com in comList) {
           List<String> demoWidgetItemInfoList = [];
           for (final demo in com.demoList!) {
@@ -310,7 +350,10 @@ class SmartUpdater {
       componentGroupList.add(componentInfoText);
     }
 
-    String registerPath = join(basePath!, 'example/lib/config/register_component.dart');
+    String registerPath = join(
+      basePath!,
+      'example/lib/config/register_component.dart',
+    );
     File registerFile = File(registerPath);
     registerFile.createSync(recursive: false);
     String fileContent = '''

@@ -29,10 +29,7 @@ class DemoRule {
 }
 
 class DemoVisitor extends RecursiveAstVisitor<void> {
-  DemoVisitor({
-    this.basePath,
-    this.filePath,
-  });
+  DemoVisitor({this.basePath, this.filePath});
 
   final String? basePath;
   final String? filePath;
@@ -55,7 +52,8 @@ class DemoVisitor extends RecursiveAstVisitor<void> {
           }
         }
       }
-    } else if (node.name.toString() == 'DemoItemStyle' && node.childEntities.isNotEmpty) {
+    } else if (node.name.toString() == 'DemoItemStyle' &&
+        node.childEntities.isNotEmpty) {
       demoInfo.isValid = true;
       for (final item in node.childEntities) {
         // print('${item.runtimeType}, $item');
@@ -70,7 +68,10 @@ class DemoVisitor extends RecursiveAstVisitor<void> {
   @override
   void visitComment(Comment node) {
     node.visitChildren(this);
-    List<String> introductions = node.tokens.map((e) => removeDocumentationComment(e.toString())).toList();
+    List<String> introductions =
+        node.tokens
+            .map((e) => removeDocumentationComment(e.toString()))
+            .toList();
     demoInfo.introductions = introductions;
     // String tmp = '';
     // if (node.childEntities.isNotEmpty) {

@@ -1,4 +1,4 @@
-# 只读校验：tdesign_api.yaml 清单 + analyzer AST validate，不写回 tdesign-flutter 源码
+# 只读校验：tdesign_api.yaml 清单 + analyzer AST validate，不写回 tdesign-component 源码
 name: API 文档合规性校验
 
 on:
@@ -18,8 +18,8 @@ permissions:
 
 env:
   FLUTTER_VERSION: "3.32.0"
-  FLUTTER_REPO: tdesign-flutter
-  FLUTTER_BRANCH: develop
+  FLUTTER_REPO: tdesign-flutter-v1
+  FLUTTER_BRANCH: main
 
 jobs:
   validate-api-docs:
@@ -43,21 +43,15 @@ jobs:
       - name: 静态分析 tools
         run: dart analyze --fatal-infos
 
-      - name: 克隆 tdesign-flutter（测试与 validate 共用）
+      - name: 克隆 tdesign-flutter-v1（测试与 validate 共用）
         run: |
           git clone --depth 1 --branch "${FLUTTER_BRANCH}" \
-            https://github.com/Tencent/tdesign-flutter.git "${FLUTTER_REPO}"
+            https://github.com/TDesignOteam/tdesign-flutter-v1.git "${FLUTTER_REPO}"
 
       - name: 单元测试（完备性相关）
         env:
           TDESIGN_COMPONENT_ROOT: ${{ github.workspace }}/${{ env.FLUTTER_REPO }}/tdesign-component
-        run: |
-          dart test test/aux_types_test.dart \
-                   test/ctor_defaults_test.dart \
-                   test/duplicate_source_test.dart \
-                   test/factory_ctor_test.dart \
-                   test/enum_members_test.dart \
-                   test/positional_ctor_test.dart
+        run: flutter test
 
       - name: 运行 AST 完备性检测（非零 exit code 即失败）
         run: |

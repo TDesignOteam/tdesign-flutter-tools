@@ -1,25 +1,21 @@
 import 'dart:io';
 
-import 'package:analyzer/dart/analysis/analysis_context_collection.dart';
 import 'package:analyzer/dart/analysis/results.dart';
-import 'package:analyzer/file_system/physical_file_system.dart';
 import 'package:path/path.dart' as p;
 import 'package:tdesign_flutter_tools/component_rule.dart';
 import 'package:tdesign_flutter_tools/model.dart';
 import 'package:tdesign_flutter_tools/smart_create.dart';
 import 'package:test/test.dart';
 
+import 'support/analyzer_context.dart';
+
 List<ParsedComponentInfoInfo> _analyseFile(String path, List<String> names) {
-  final AnalysisContextCollection col = AnalysisContextCollection(
-    includedPaths: <String>[path],
-    resourceProvider: PhysicalResourceProvider.INSTANCE,
-  );
+  final col = testAnalysisContextCollection(includedPaths: <String>[path]);
   final ParsedUnitResult parsed =
       col.contextFor(path).currentSession.getParsedUnit(path)
           as ParsedUnitResult;
   return ComponentRule(
     parsedUnitResult: parsed,
-    isGrammarParser: false,
     nameList: names,
     sourceFileName: p.basename(path),
   ).analyse();
@@ -92,7 +88,6 @@ enum TAvatarSize {
           output: '',
           isFileMode: true,
           onlyApi: true,
-          isGrammarParser: false,
         );
 
         await creator.generateApiInfoFile(<ParsedComponentInfoInfo>[parsed]);

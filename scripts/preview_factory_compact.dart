@@ -42,7 +42,6 @@ class DemoOptions {
     path: 'demo_options.dart',
     folderName: 'demo',
     output: 'out/',
-    isGrammarParser: false,
   );
   await creator.run();
 
@@ -55,4 +54,3 @@ class DemoOptions {
   stdout.writeln('Generated: ${md.path}');
   stdout.writeln(await md.readAsString());
 }
-

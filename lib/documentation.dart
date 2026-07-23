@@ -95,7 +95,9 @@ String formatDartdocReferencesInProse(
     if (buffer.isNotEmpty) {
       buffer.writeln();
     }
-    buffer.write(_formatDartdocReferencesInLine(line, parameterNames: parameterNames));
+    buffer.write(
+      _formatDartdocReferencesInLine(line, parameterNames: parameterNames),
+    );
   }
   return buffer.toString();
 }
@@ -159,10 +161,11 @@ ParsedDocumentation parseDocumentation(
     return ParsedDocumentation(narrative: '');
   }
 
-  final Set<String> names = parameterNames
-      .map((String n) => n.trim())
-      .where((String n) => n.isNotEmpty)
-      .toSet();
+  final Set<String> names =
+      parameterNames
+          .map((String n) => n.trim())
+          .where((String n) => n.isNotEmpty)
+          .toSet();
   if (names.isEmpty) {
     return ParsedDocumentation(
       narrative: formatDartdocReferencesInProse(normalized),
@@ -211,9 +214,8 @@ ParsedDocumentation parseDocumentation(
 
     if (activeParam != null && !trimmed.startsWith('[')) {
       final String existing = paramDocs[activeParam!] ?? '';
-      paramDocs[activeParam!] = existing.isEmpty
-          ? trimmed
-          : '$existing\n$trimmed';
+      paramDocs[activeParam!] =
+          existing.isEmpty ? trimmed : '$existing\n$trimmed';
       continue;
     }
 

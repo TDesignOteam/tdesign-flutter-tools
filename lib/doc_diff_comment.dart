@@ -41,7 +41,13 @@ class DocDiffComment {
     final paths = <String>{};
     final git = ['-C', repoRoot];
 
-    final names = await Process.run('git', [...git, 'diff', '--name-only', '--', ..._gitPaths]);
+    final names = await Process.run('git', [
+      ...git,
+      'diff',
+      '--name-only',
+      '--',
+      ..._gitPaths,
+    ]);
     // git diff 有变更时 exit 0；仅当命令本身失败才退出
     if (names.exitCode > 1) {
       _exitIfFail(names, 'git diff --name-only');
@@ -50,7 +56,14 @@ class DocDiffComment {
       if (line.trim().isNotEmpty) paths.add(line.trim());
     }
 
-    final status = await Process.run('git', [...git, 'status', '--porcelain', '-u', '--', ..._gitPaths]);
+    final status = await Process.run('git', [
+      ...git,
+      'status',
+      '--porcelain',
+      '-u',
+      '--',
+      ..._gitPaths,
+    ]);
     _exitIfFail(status, 'git status');
     for (final line in '${status.stdout}'.split('\n')) {
       if (line.startsWith('??')) paths.add(line.substring(3).trim());
@@ -71,14 +84,30 @@ class DocDiffComment {
 
   Future<String> _diff(String rel) async {
     final git = ['-C', repoRoot];
-    final tracked = await Process.run('git', [...git, 'ls-files', '--error-unmatch', rel]);
+    final tracked = await Process.run('git', [
+      ...git,
+      'ls-files',
+      '--error-unmatch',
+      rel,
+    ]);
     if (tracked.exitCode == 0) {
-      final r = await Process.run('git', [...git, 'diff', '--no-color', '-U3', '--', rel]);
-      return '${r.stdout}'.trimRight().isEmpty ? '(无变更内容)' : '${r.stdout}'.trimRight();
+      final r = await Process.run('git', [
+        ...git,
+        'diff',
+        '--no-color',
+        '-U3',
+        '--',
+        rel,
+      ]);
+      return '${r.stdout}'.trimRight().isEmpty
+          ? '(无变更内容)'
+          : '${r.stdout}'.trimRight();
     }
     final full = '${Directory(repoRoot).path}${Platform.pathSeparator}$rel';
     final r = await Process.run('diff', ['-u', '/dev/null', full]);
-    return '${r.stdout}'.trimRight().isEmpty ? '(新文件)' : '${r.stdout}'.trimRight();
+    return '${r.stdout}'.trimRight().isEmpty
+        ? '(新文件)'
+        : '${r.stdout}'.trimRight();
   }
 
   String _details(({String path, String diff}) f) {

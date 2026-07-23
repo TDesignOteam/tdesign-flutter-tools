@@ -1,4 +1,4 @@
-# PR：用本仓库 tools 构建 tdesign-flutter 预览 + 文档 diff（评论见 preview-publish.yml）
+# PR：用本仓库 tools 构建 tdesign-flutter-v1 预览 + 文档 diff（评论见 preview-publish.yml）
 name: PR 文档预览构建
 
 on:
@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 45
     env:
       TOOLS: ${{ github.workspace }}
-      FLUTTER_REPO: tdesign-flutter
+      FLUTTER_REPO: tdesign-flutter-v1
     steps:
       - uses: actions/checkout@v4
 
@@ -37,8 +37,8 @@ jobs:
 
       - run: git config --global core.symlinks false
 
-      - name: 克隆 tdesign-flutter
-        run: git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
+      - name: 克隆 tdesign-flutter-v1
+        run: git clone --depth 1 --branch main https://github.com/TDesignOteam/tdesign-flutter-v1.git tdesign-flutter-v1
 
       - name: 链接本 PR tools（path，无需 compile）
         working-directory: ${{ env.FLUTTER_REPO }}/tdesign-component

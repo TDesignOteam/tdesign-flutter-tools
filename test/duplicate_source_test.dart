@@ -6,33 +6,35 @@ void main() {
   test('reportDuplicateAuxiliaryDefinitions warns on cross-file enum dup', () {
     final items = [
       ParsedComponentInfoInfo()
-        ..componentInfo = (ComponentInfo()
-          ..name = 'CalendarTrigger'
-          ..kind = 'enum'
-          ..sourceFile = 't_calendar.dart')
+        ..componentInfo =
+            (ComponentInfo()
+              ..name = 'CalendarTrigger'
+              ..kind = 'enum'
+              ..sourceFile = 't_calendar.dart')
         ..propertyList = []
         ..extraPropertyList = []
         ..staticMemberList = []
         ..fieldMap = {},
       ParsedComponentInfoInfo()
-        ..componentInfo = (ComponentInfo()
-          ..name = 'CalendarTrigger'
-          ..kind = 'enum'
-          ..sourceFile = 't_calendar_popup.dart')
+        ..componentInfo =
+            (ComponentInfo()
+              ..name = 'CalendarTrigger'
+              ..kind = 'enum'
+              ..sourceFile = 't_calendar_popup.dart')
         ..propertyList = []
         ..extraPropertyList = []
         ..staticMemberList = []
         ..fieldMap = {},
     ];
-  expect(
-    () => reportDuplicateAuxiliaryDefinitions(items),
-    prints(
-      allOf(
-        contains('CalendarTrigger'),
-        contains('t_calendar.dart'),
-        contains('t_calendar_popup.dart'),
+    expect(
+      () => reportDuplicateAuxiliaryDefinitions(items),
+      prints(
+        allOf(
+          contains('CalendarTrigger'),
+          contains('t_calendar.dart'),
+          contains('t_calendar_popup.dart'),
+        ),
       ),
-    ),
-  );
+    );
   });
 }

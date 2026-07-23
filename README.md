@@ -7,32 +7,32 @@
 
 ## 注意事项
 
-1. **在 `tdesign-component` 根目录执行 `generate`**  
+1. **在 `tdesign-component` 根目录执行 `generate`**
    `basePath` 指向 component 根目录；在 tools 仓库里直接跑会找不到源码。
 
-2. **只生成 API 时加 `--only-api`**  
+2. **只生成 API 时加 `--only-api`**
    否则会额外生成 demo 示例文件。
 
-3. **参数说明写在「方法注释」或「字段注释」**  
-   - 静态方法 / 工厂 / 构造：推荐在该方法的 `///` 里写 `[paramName] 说明`。  
-   - 构造参数：也可写在同名字段的 `///` 上。  
+3. **参数说明写在「方法注释」或「字段注释」**
+   - 静态方法 / 工厂 / 构造：推荐在该方法的 `///` 里写 `[paramName] 说明`。
+   - 构造参数：也可写在同名字段的 `///` 上。
    - 无注释时表格「说明」列为 `-`，属预期，应在源码补全，**不要**在工具里打补丁。
 
-4. **不要把静态方法参数表只写在类简介里**  
+4. **不要把静态方法参数表只写在类简介里**
    类注释中的 `## xxx 参数` Markdown 表**不会**回填到方法参数表，方法表仍会显示 `-`。
 
-5. **`--get-comments` 控制是否输出 `#### 简介`**  
-   - 不加：只生成参数表、工厂、枚举值等，**不写**类简介。  
-   - 加上：输出简介，并自动去掉 `**示例**` 与所有 `` ``` `` 代码块（简介里不放代码）。  
+5. **`--get-comments` 控制是否输出 `#### 简介`**
+   - 不加：只生成参数表、工厂、枚举值等，**不写**类简介。
+   - 加上：输出简介，并自动去掉 `**示例**` 与所有 `` ``` `` 代码块（简介里不放代码）。
    旧版曾在多类型之间误插入空 `` ``` `` 两行，当前已移除；请用 `dart run bin/main.dart` 生成。
 
-6. **`library` + `part` 需在 `--name` 中显式列出类型**  
+6. **`library` + `part` 需在 `--name` 中显式列出类型**
    例如 popup 的 `TPopupOptions`、`TPopupPlacement` 在 part 文件中，需写入 `--name` 或单独对 part 文件生成。
 
-7. **不对个别组件做特殊兼容**  
-   工具只走通用 AST / dartdoc 规则；注释位置或格式不对，应在 `tdesign-component` 修正。
+7. **不对个别组件做特殊兼容**
+   工具只保留单一 AST / dartdoc 解析路线；注释位置或格式不对，应在 `tdesign-component` 修正。
 
-8. **CI 抽测清单见 `.github/config/tdesign_api.yaml`**  
+8. **CI 抽测清单见 `.github/config/tdesign_api.yaml`**
    本地 `validate` 与 CI 使用同一配置；`ERROR` 需为 0，`WARN` 多为 enum 成员缺注释等源码问题。
 
 ## 快速开始
@@ -40,7 +40,7 @@
 ```bash
 # 环境
 export TOOLS=/path/to/tdesign-flutter-tools
-export COMPONENT=/path/to/tdesign-flutter/tdesign-component
+export COMPONENT=/path/to/tdesign-flutter-v1/tdesign-component
 export TDESIGN_COMPONENT_ROOT=$COMPONENT   # 跑 tools 单元测试时用
 
 cd $TOOLS && dart pub get
@@ -148,7 +148,6 @@ dart run <tools>/bin/main.dart generate [选项]
 | `--folder-name` | 输出文件名前缀，如 `popup` → `popup_api.md` |
 | `--only-api` | 只生成 API，不生成 demo |
 | `--output` | 输出目录（可用绝对路径写到 tools 仓库外预览） |
-| `--use-grammar` | 使用语法分析（默认词法分析） |
 
 **示例**
 

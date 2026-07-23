@@ -6,7 +6,9 @@ import 'model.dart';
 // 驼峰转下划线
 String CamelToUnderline(String input) {
   RegExp exp = RegExp(r'(?<=[a-z])[A-Z]');
-  return input.replaceAllMapped(exp, (Match m) => ('_' + m.group(0)!)).toLowerCase();
+  return input
+      .replaceAllMapped(exp, (Match m) => ('_' + m.group(0)!))
+      .toLowerCase();
 }
 
 // 移除注释中的///
@@ -159,9 +161,7 @@ void reportDuplicateAuxiliaryDefinitions(List<ParsedComponentInfoInfo> items) {
     final String kindLabel = parts[0] == 'enum' ? 'enum' : 'typedef';
     final String typeName = parts.length > 1 ? parts[1] : entry.key;
     final String files = entry.value.toSet().join(', ');
-    print(pen(
-      'Warning: 源码重复定义 $kindLabel `$typeName`，出现在: $files',
-    ));
+    print(pen('Warning: 源码重复定义 $kindLabel `$typeName`，出现在: $files'));
     print(pen('  建议: 将 `$typeName` 收敛到单一文件定义，避免文档重复与维护漂移'));
   }
 }
@@ -177,4 +177,3 @@ bool isValidDemoClass(String className) {
   final regex = RegExp(r'.*Demo[0-9]+$');
   return regex.hasMatch(className);
 }
-

@@ -11,7 +11,13 @@ components:
     source_folder: lib/src/components/button
     classes:
       - TButton
-      - TButtonStyle
+      - TButtonResolve
+      - TButtonThemeData
+      - TButtonSize
+      - TButtonVariant
+      - TButtonColorScheme
+      - TButtonIconPosition
+      - TButtonShape
 
   picker:
     folder_name: picker
@@ -20,10 +26,8 @@ components:
       - TPicker
       - TPickerOption
       - TPickerValue
-      - TPickerLoadEvent
       - TPickerColumns
       - TPickerLinked
-      - TPickerItems
       - TPickerKeys
 
   popup:
@@ -40,7 +44,6 @@ components:
     folder_name: dialog
     source_folder: lib/src/components/dialog
     classes:
-      - TAlertDialog
       - TConfirmDialog
       - TDialogButtonOptions
       - TDialogButtonStyle
@@ -51,17 +54,13 @@ components:
       - HorizontalNormalButtons
       - HorizontalTextButtons
       - TDialogButton
-      - TDialogImagePosition
-      - TImageDialog
-      - TInputDialog
 
   calendar:
     folder_name: calendar
     source_folder: lib/src/components/calendar
     classes:
       - TCalendar
-      - TCalendarPopup
       - TCalendarStyle
-      - TCalendarDataSource
-      - TLunarInfo
-      - TCalendarDateType
+      - DateSelectType
+      - TCalendarSubtitleContext
+      - TCalendarCellModel

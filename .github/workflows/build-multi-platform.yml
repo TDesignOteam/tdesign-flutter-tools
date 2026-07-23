@@ -27,8 +27,8 @@ jobs:
       - run: dart compile exe bin/main.dart -o api_tool_macos_intel
       - name: Verify binary
         run: |
-          git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
-          dart run .github/scripts/cross_platform_verify.dart tdesign-flutter api_tool_macos_intel
+          git clone --depth 1 --branch main https://github.com/TDesignOteam/tdesign-flutter-v1.git tdesign-flutter-v1
+          dart run .github/scripts/cross_platform_verify.dart tdesign-flutter-v1 api_tool_macos_intel
       - uses: actions/upload-artifact@v4
         with:
           name: api_tool_macos_intel
@@ -47,8 +47,8 @@ jobs:
       - run: dart compile exe bin/main.dart -o api_tool_macos_arm64 --target-os=macos --target-arch=arm64
       - name: Verify binary
         run: |
-          git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
-          dart run .github/scripts/cross_platform_verify.dart tdesign-flutter api_tool_macos_arm64
+          git clone --depth 1 --branch main https://github.com/TDesignOteam/tdesign-flutter-v1.git tdesign-flutter-v1
+          dart run .github/scripts/cross_platform_verify.dart tdesign-flutter-v1 api_tool_macos_arm64
       - uses: actions/upload-artifact@v4
         with:
           name: api_tool_macos_arm64
@@ -67,8 +67,8 @@ jobs:
       - run: dart compile exe bin/main.dart -o api_tool_linux --target-arch=x64
       - name: Verify binary
         run: |
-          git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
-          dart run .github/scripts/cross_platform_verify.dart tdesign-flutter api_tool_linux
+          git clone --depth 1 --branch main https://github.com/TDesignOteam/tdesign-flutter-v1.git tdesign-flutter-v1
+          dart run .github/scripts/cross_platform_verify.dart tdesign-flutter-v1 api_tool_linux
       - uses: actions/upload-artifact@v4
         with:
           name: api_tool_linux
@@ -88,8 +88,8 @@ jobs:
       - name: Verify binary
         shell: bash
         run: |
-          git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
-          dart run .github/scripts/cross_platform_verify.dart tdesign-flutter api_tool_windows.exe
+          git clone --depth 1 --branch main https://github.com/TDesignOteam/tdesign-flutter-v1.git tdesign-flutter-v1
+          dart run .github/scripts/cross_platform_verify.dart tdesign-flutter-v1 api_tool_windows.exe
       - uses: actions/upload-artifact@v4
         with:
           name: api_tool_windows
