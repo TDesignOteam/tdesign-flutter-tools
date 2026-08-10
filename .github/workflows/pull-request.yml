@@ -59,14 +59,6 @@ jobs:
           cache: "pnpm"
           cache-dependency-path: "${{ env.FLUTTER_REPO }}/tdesign-site/pnpm-lock.yaml"
 
-      - uses: TDesignOteam/workflows/actions/setup-flutter@main
-        with:
-          flutter-version: 3.32.0
-          channel: stable
-          cache: true
-          aop-registry: true
-          aop-project-path: ./${{ env.FLUTTER_REPO }}/tdesign-component/example
-
       - name: 依赖解析
         working-directory: ${{ env.FLUTTER_REPO }}/tdesign-component
         run: flutter pub get
