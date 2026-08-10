@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:analyzer/dart/analysis/utilities.dart';
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 import 'package:tdesign_flutter_tools/component_rule.dart';
 import 'package:tdesign_flutter_tools/demo_rule.dart';
 import 'package:tdesign_flutter_tools/model.dart';

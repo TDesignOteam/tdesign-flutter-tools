@@ -8,19 +8,19 @@ environment:
   flutter: ">=3.32.0"
 
 dependencies:
+  flutter:
+    sdk: flutter
   path: ^1.8.3
   args: ^2.4.2
-  dart_style: ^2.3.4
+  dart_style: ^3.0.0
   markdown: ^7.1.1
   ansicolor: ^2.0.2
-  analyzer: ^6.2.0
+  analyzer: ^7.4.0
   collection: ^1.18.0
 
 
 dev_dependencies:
-  flutter_test:
-    sdk: flutter
-  test: ^1.25.15
+  test: ^1.26.3
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
