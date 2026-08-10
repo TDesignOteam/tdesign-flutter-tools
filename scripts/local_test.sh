@@ -8,8 +8,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TOOLS_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 if [[ -n "${TDESIGN_COMPONENT_ROOT:-}" ]]; then
   COMPONENT_DIR="$(cd "${TDESIGN_COMPONENT_ROOT}" && pwd)"
-elif [[ -d "${TOOLS_DIR}/../tdesign-flutter-v1/tdesign-component" ]]; then
-  COMPONENT_DIR="$(cd "${TOOLS_DIR}/../tdesign-flutter-v1/tdesign-component" && pwd)"
+elif [[ -d "${TOOLS_DIR}/../tdesign-flutter/tdesign-component" ]]; then
+  COMPONENT_DIR="$(cd "${TOOLS_DIR}/../tdesign-flutter/tdesign-component" && pwd)"
 else
   COMPONENT_DIR="$(cd "${TOOLS_DIR}/../tdesign-component" && pwd)"
 fi

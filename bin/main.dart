@@ -94,7 +94,7 @@ class ValidateCommand extends Command {
     argParser.addOption(
       'component-root',
       help: 'tdesign-component 根目录路径',
-      defaultsTo: '../tdesign-flutter-v1/tdesign-component',
+      defaultsTo: '../tdesign-flutter/tdesign-component',
     );
     argParser.addOption(
       'config',

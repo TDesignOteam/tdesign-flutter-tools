@@ -18,8 +18,8 @@ permissions:
 
 env:
   FLUTTER_VERSION: "3.32.0"
-  FLUTTER_REPO: tdesign-flutter-v1
-  FLUTTER_BRANCH: main
+  FLUTTER_REPO: tdesign-flutter
+  FLUTTER_BRANCH: develop
 
 jobs:
   validate-api-docs:
@@ -43,10 +43,10 @@ jobs:
       - name: 静态分析 tools
         run: dart analyze --fatal-infos
 
-      - name: 克隆 tdesign-flutter-v1（测试与 validate 共用）
+      - name: 克隆 tdesign-flutter（测试与 validate 共用）
         run: |
           git clone --depth 1 --branch "${FLUTTER_BRANCH}" \
-            https://github.com/TDesignOteam/tdesign-flutter-v1.git "${FLUTTER_REPO}"
+            https://github.com/Tencent/tdesign-flutter.git "${FLUTTER_REPO}"
 
       - name: 单元测试（完备性相关）
         env:
