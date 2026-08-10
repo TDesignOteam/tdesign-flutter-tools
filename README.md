@@ -40,7 +40,7 @@
 ```bash
 # 环境
 export TOOLS=/path/to/tdesign-flutter-tools
-export COMPONENT=/path/to/tdesign-flutter-v1/tdesign-component
+export COMPONENT=/path/to/tdesign-flutter/tdesign-component
 export TDESIGN_COMPONENT_ROOT=$COMPONENT   # 跑 tools 单元测试时用
 
 cd $TOOLS && dart pub get

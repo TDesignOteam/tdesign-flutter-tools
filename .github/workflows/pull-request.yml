@@ -1,4 +1,4 @@
-# PR：用本仓库 tools 构建 tdesign-flutter-v1 预览 + 文档 diff（评论见 preview-publish.yml）
+# PR：用本仓库 tools 构建 tdesign-flutter 预览 + 文档 diff（评论见 preview-publish.yml）
 name: PR 文档预览构建
 
 on:
@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 45
     env:
       TOOLS: ${{ github.workspace }}
-      FLUTTER_REPO: tdesign-flutter-v1
+      FLUTTER_REPO: tdesign-flutter
     steps:
       - uses: actions/checkout@v4
 
@@ -37,8 +37,8 @@ jobs:
 
       - run: git config --global core.symlinks false
 
-      - name: 克隆 tdesign-flutter-v1
-        run: git clone --depth 1 --branch main https://github.com/TDesignOteam/tdesign-flutter-v1.git tdesign-flutter-v1
+      - name: 克隆 tdesign-flutter
+        run: git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git tdesign-flutter
 
       - name: 链接本 PR tools（path，无需 compile）
         working-directory: ${{ env.FLUTTER_REPO }}/tdesign-component
@@ -49,23 +49,15 @@ jobs:
               path: ../../
           EOF
 
-      - uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@v6
         with:
-          version: 9
+          package_json_file: ${{ env.FLUTTER_REPO }}/tdesign-site/package.json
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "pnpm"
           cache-dependency-path: "${{ env.FLUTTER_REPO }}/tdesign-site/pnpm-lock.yaml"
-
-      - uses: TDesignOteam/workflows/actions/setup-flutter@main
-        with:
-          flutter-version: 3.32.0
-          channel: stable
-          cache: true
-          aop-registry: true
-          aop-project-path: ./${{ env.FLUTTER_REPO }}/tdesign-component/example
 
       - name: 依赖解析
         working-directory: ${{ env.FLUTTER_REPO }}/tdesign-component
@@ -85,8 +77,8 @@ jobs:
       - name: 构建站点
         working-directory: ${{ env.FLUTTER_REPO }}/tdesign-site
         run: |
-          pnpm install --frozen-lockfile
-          npm run site
+          pnpm ci
+          pnpm run site
 
       - name: 组装预览目录
         working-directory: ${{ env.FLUTTER_REPO }}
