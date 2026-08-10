@@ -49,13 +49,13 @@ jobs:
               path: ../../
           EOF
 
-      - uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@v6
         with:
-          version: 9
+          package_json_file: ${{ env.FLUTTER_REPO }}/tdesign-site/package.json
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "pnpm"
           cache-dependency-path: "${{ env.FLUTTER_REPO }}/tdesign-site/pnpm-lock.yaml"
 
@@ -77,8 +77,8 @@ jobs:
       - name: 构建站点
         working-directory: ${{ env.FLUTTER_REPO }}/tdesign-site
         run: |
-          pnpm install --frozen-lockfile
-          npm run site
+          pnpm ci
+          pnpm run site
 
       - name: 组装预览目录
         working-directory: ${{ env.FLUTTER_REPO }}
