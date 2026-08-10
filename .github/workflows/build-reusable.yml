@@ -1,0 +1,61 @@
+name: Build Single Platform
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        description: 'GitHub Actions runner (e.g. macos-latest, ubuntu-latest, windows-latest)'
+        required: true
+        type: string
+      artifact-name:
+        description: 'Name for the uploaded artifact'
+        required: true
+        type: string
+      binary-name:
+        description: 'Output binary file name'
+        required: true
+        type: string
+      compile-args:
+        description: 'Extra arguments for dart compile exe'
+        required: false
+        type: string
+        default: ''
+    outputs:
+      artifact-id:
+        description: 'Uploaded artifact ID'
+        value: ${{ jobs.build.outputs.artifact_id }}
+      artifact-url:
+        description: 'Uploaded artifact URL'
+        value: ${{ jobs.build.outputs.artifact_url }}
+
+jobs:
+  build:
+    runs-on: ${{ inputs.runner }}
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      artifact_url: ${{ steps.upload.outputs.artifact-url }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.32.0'
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build binary
+        run: dart compile exe bin/main.dart -o ${{ inputs.binary-name }} ${{ inputs.compile-args }}
+
+      - name: Verify binary
+        run: |
+          git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git
+          dart run .github/scripts/cross_platform_verify.dart tdesign-flutter ${{ inputs.binary-name }}
+
+      - name: Upload Artifact
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: ${{ inputs.binary-name }}
