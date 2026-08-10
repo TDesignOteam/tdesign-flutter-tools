@@ -367,7 +367,9 @@ class SmartUpdater {
     ${componentGroupList.join('\n')}
     ];
     ''';
-    final dartFormatter = DartFormatter();
+    final dartFormatter = DartFormatter(
+      languageVersion: DartFormatter.latestLanguageVersion,
+    );
     await registerFile.writeAsString(dartFormatter.format(fileContent));
     // print('$name 组件示例注册成功');
   }
