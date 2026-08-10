@@ -45,6 +45,7 @@ jobs:
         run: |
           cat > pubspec_overrides.yaml <<'EOF'
           dependency_overrides:
+            analyzer: ^7.4.0
             tdesign_flutter_tools:
               path: ../../
           EOF
