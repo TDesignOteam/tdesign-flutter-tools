@@ -38,7 +38,7 @@ void main() {
 
       final List<String> names = parsed
           .map((ParsedComponentInfoInfo e) => e.componentInfo!.name!)
-          .where((String n) => n != null && n.isNotEmpty)
+          .where((String n) => n.isNotEmpty)
           .toList();
 
       // 两个目标类都出现，且字母序文件（a 在 z 之前）先生成。
