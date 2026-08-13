@@ -57,6 +57,8 @@ class SmartCreator {
         for (final item in filesInDir) {
           files.add(item.path);
         }
+        // Directory.listSync() 不保证目录顺序，排序以确保生成的 *_api.md 内容顺序固定、可复现。
+        files.sort();
       } else {
         AnsiPen pen = AnsiPen()..red(bold: true);
         print(pen('输入的文件夹路径不对: $fullPath'));
@@ -152,6 +154,10 @@ class SmartCreator {
             files.add(item.path);
           }
         }
+        // Directory.listSync() 不保证目录顺序，跨环境/文件系统可能返回不同顺序，
+        // 导致生成的 *_api.md 中类型顺序不稳定（git 中反复出现 M 变更）。
+        // 排序保证输出内容固定、可复现。
+        files.sort();
       }
     }
     return files;
