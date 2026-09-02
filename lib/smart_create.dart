@@ -12,6 +12,7 @@ import 'package:analyzer/dart/analysis/results.dart';
 import 'component_rule.dart';
 import 'documentation.dart';
 import 'model.dart';
+import 'src/dart_sdk_detector.dart';
 import 'util.dart';
 
 // ignore_for_file: always_specify_types
@@ -71,7 +72,7 @@ class SmartCreator {
       sb.write("path:$element   \n");
     });
     // try to detect Dart SDK robustly (async): prefer env, flutter cache, 'where'/'which', then walk up from resolvedExecutable
-    String? sdkPath = await _detectSdkPath();
+    String? sdkPath = await DartSdkDetector().detect();
     if (sdkPath != null && sdkPath.isNotEmpty) {
       AnsiPen pen = AnsiPen()..green(bold: true);
       print(pen('Detected Dart SDK: $sdkPath'));
@@ -109,13 +110,13 @@ class SmartCreator {
     }
     final int startTime = DateTime.now().microsecondsSinceEpoch;
     if (!quiet) {
-      final String? sdkPath = await _detectSdkPath();
+      final String? sdkPath = await DartSdkDetector().detect();
       if (sdkPath != null && sdkPath.isNotEmpty) {
         AnsiPen pen = AnsiPen()..green(bold: true);
         print(pen('Detected Dart SDK: $sdkPath'));
       }
     }
-    final String? sdkPath = await _detectSdkPath();
+    final String? sdkPath = await DartSdkDetector().detect();
     final AnalysisContextCollection analysisContextCollection =
         (sdkPath != null && sdkPath.isNotEmpty)
             ? AnalysisContextCollection(
@@ -161,88 +162,6 @@ class SmartCreator {
       }
     }
     return files;
-  }
-
-  // Attempt to detect Dart SDK path using multiple strategies:
-  // 1) DART_SDK env
-  // 2) FLUTTER_ROOT/FLUTTER_HOME -> bin/cache/dart-sdk
-  // 3) run 'where dart' (Windows) or 'which dart' (posix) and inspect parent dirs
-  // 4) walk up from Platform.resolvedExecutable looking for 'lib/_internal'
-  Future<String?> _detectSdkPath() async {
-    // 1) env
-    String? sdkPath = Platform.environment['DART_SDK'];
-    if (sdkPath != null && sdkPath.isNotEmpty) {
-      return normalize(sdkPath);
-    }
-
-    // 2) flutter env
-    final flutterRoot =
-        Platform.environment['FLUTTER_ROOT'] ??
-        Platform.environment['FLUTTER_HOME'];
-    if (flutterRoot != null && flutterRoot.isNotEmpty) {
-      final candidate = normalize(
-        join(flutterRoot, 'bin', 'cache', 'dart-sdk'),
-      );
-      if (Directory(candidate).existsSync()) return candidate;
-    }
-
-    // 3) find 'dart' executable using platform tools
-    try {
-      if (Platform.isWindows) {
-        var result = await Process.run('where.exe', ['dart']);
-        if (result.exitCode == 0) {
-          final stdoutStr = result.stdout.toString();
-          final lines = stdoutStr.trim().split(RegExp(r"\r?\n"));
-          if (lines.isNotEmpty) {
-            final dartExe = lines.first.trim();
-            final binDir = dirname(dartExe);
-            final parent = dirname(binDir);
-            // check for flutter cached sdk
-            final flutterCache = normalize(
-              join(parent, 'bin', 'cache', 'dart-sdk'),
-            );
-            if (Directory(flutterCache).existsSync()) return flutterCache;
-            // check for lib/_internal
-            final internal = normalize(join(parent, 'lib', '_internal'));
-            if (Directory(internal).existsSync()) return parent;
-            return parent;
-          }
-        }
-      } else {
-        var result = await Process.run('which', ['dart']);
-        if (result.exitCode == 0) {
-          final dartExe = result.stdout.toString().trim();
-          if (dartExe.isNotEmpty) {
-            final binDir = dirname(dartExe);
-            final parent = dirname(binDir);
-            final internal = normalize(join(parent, 'lib', '_internal'));
-            if (Directory(internal).existsSync()) return parent;
-            return parent;
-          }
-        }
-      }
-    } catch (e) {
-      // ignore failures
-    }
-
-    // 4) walk up from resolvedExecutable
-    try {
-      String exec = Platform.resolvedExecutable;
-      String dir = normalize(dirname(exec));
-      for (int i = 0; i < 8; i++) {
-        final candidate = normalize(join(dir, 'lib', '_internal'));
-        if (Directory(candidate).existsSync()) {
-          return normalize(dirname(candidate));
-        }
-        final parent = dirname(dir);
-        if (parent == dir) break;
-        dir = parent;
-      }
-    } catch (e) {
-      // ignore
-    }
-
-    return null;
   }
 
   Future<List<ParsedComponentInfoInfo>> _parseComponents(
