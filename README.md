@@ -14,7 +14,7 @@
    否则会额外生成 demo 示例文件。
 
 3. **参数说明写在「方法注释」或「字段注释」**
-   - 静态方法 / 工厂 / 构造：推荐在该方法的 `///` 里写 `[paramName] 说明`。
+   - 顶层函数 / 静态方法 / 工厂 / 构造：推荐在该方法的 `///` 里写 `[paramName] 说明`。
    - 构造参数：也可写在同名字段的 `///` 上。
    - 无注释时表格「说明」列为 `-`，属预期，应在源码补全，**不要**在工具里打补丁。
 
@@ -26,13 +26,16 @@
    - 加上：输出简介，并自动去掉 `**示例**` 与所有 `` ``` `` 代码块（简介里不放代码）。
    旧版曾在多类型之间误插入空 `` ``` `` 两行，当前已移除；请用 `dart run bin/main.dart` 生成。
 
-6. **`library` + `part` 需在 `--name` 中显式列出类型**
+6. **`library` + `part` 需在 `--name` 中显式列出声明**
    例如 popup 的 `TPopupOptions`、`TPopupPlacement` 在 part 文件中，需写入 `--name` 或单独对 part 文件生成。
 
-7. **不对个别组件做特殊兼容**
+7. **顶层函数需在 `--name` 中显式列出**
+   工具会为任意公开顶层函数生成独立 API 区块，包含返回类型、参数类型、默认值和 dartdoc；私有函数、getter、setter 以及未登记函数不会被收录。
+
+8. **不对个别组件做特殊兼容**
    工具只保留单一 AST / dartdoc 解析路线；注释位置或格式不对，应在 `tdesign-component` 修正。
 
-8. **CI 抽测清单见 `.github/config/tdesign_api.yaml`**
+9. **CI 抽测清单见 `.github/config/tdesign_api.yaml`**
    本地 `validate` 与 CI 使用同一配置；`ERROR` 需为 0，`WARN` 多为 enum 成员缺注释等源码问题。
 
 ## 快速开始
@@ -88,7 +91,7 @@ class TFoo { ... }
 final int count;
 ```
 
-### 静态方法 / 工厂（推荐）
+### 顶层函数 / 静态方法 / 工厂（推荐）
 
 ```dart
 /// 方法简述。
@@ -96,6 +99,17 @@ final int count;
 /// [context] 用于展示浮层。
 /// [options] 配置对象。
 static void show(BuildContext context, {required FooOptions options}) { ... }
+```
+
+顶层函数使用相同的 dartdoc 参数约定，并直接将函数名加入 `--name`：
+
+```bash
+dart run bin/main.dart generate \
+  --folder lib/src/components/drawer \
+  --name TDrawer,showTDrawer \
+  --folder-name drawer \
+  --only-api \
+  --get-comments
 ```
 
 dartdoc 引用 `[Type]`、`[param]` 会转为 Markdown 行内代码；已有 Markdown 链接 `[text](url)` 保持原样。
@@ -126,7 +140,7 @@ enum TSize { small, medium, large }
 
 | 工具负责 | 源码负责 |
 | --- | --- |
-| 提取类型、默认值；过滤 `this.xxx` 误识别 | 参数 / 字段 `///` 文案 |
+| 提取 class、enum、typedef、顶层函数的类型和默认值；过滤 `this.xxx` 误识别 | 参数 / 字段 `///` 文案 |
 | 静态方法 → 命名工厂 → 默认构造 → 公开属性/成员 | 注释位置、语义正确 |
 | 隐藏 `ClassName._`；dartdoc → Markdown | 无注释时显示 `-` |
 | 同文件收录 public enum/typedef；跨文件重复告警 | `--name` 与 CI 清单一致 |

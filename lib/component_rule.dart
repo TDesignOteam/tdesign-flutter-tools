@@ -781,6 +781,51 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
   }
 
   @override
+  void visitFunctionDeclaration(FunctionDeclaration node) {
+    if (node.parent is! CompilationUnit) {
+      super.visitFunctionDeclaration(node);
+      return;
+    }
+    final String functionName = node.name.lexeme;
+    final FormalParameterList? parameters = node.functionExpression.parameters;
+    if (functionName.startsWith('_') ||
+        !nameList!.contains(functionName) ||
+        node.isGetter ||
+        node.isSetter ||
+        parameters == null) {
+      super.visitFunctionDeclaration(node);
+      return;
+    }
+
+    _targetFoundInUnit = true;
+    final StaticMethodInfo functionInfo =
+        StaticMethodInfo()
+          ..name = functionName
+          ..returnType = node.returnType?.toSource() ?? 'dynamic'
+          ..introduction = node.documentationComment?.tokens.join('\n') ?? '';
+    for (final FormalParameter parameter in parameters.parameters) {
+      functionInfo.params.add(_buildPropertyFromParameter(parameter));
+    }
+    applyCallableDocumentation(functionInfo);
+    for (final PropertyInfo parameter in functionInfo.params) {
+      if (parameter.type.isEmpty) {
+        parameter.type = '-';
+      }
+      if (parameter.introduction.isEmpty) {
+        parameter.introduction = fallbackParameterIntroduction(parameter.name);
+      }
+    }
+
+    final ComponentInfo function =
+        ComponentInfo()
+          ..name = functionName
+          ..kind = 'function'
+          ..introduction = functionInfo.introduction
+          ..topLevelFunction = functionInfo;
+    _emitParsedInfo(_emptyParsedInfo(function));
+  }
+
+  @override
   void visitClassDeclaration(ClassDeclaration node) {
     final String className = node.name.toString();
     final bool isTarget = nameList!.contains(className);
