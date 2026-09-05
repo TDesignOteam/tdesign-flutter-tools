@@ -281,6 +281,8 @@ class SmartCreator {
 
     int kindOrder(ParsedComponentInfoInfo info) {
       switch (info.componentInfo?.kind) {
+        case 'function':
+          return 0;
         case 'enum':
           return 1;
         case 'typedef':
@@ -416,6 +418,33 @@ class SmartCreator {
           sb.write(
             '```dart\n${apiInfo.componentInfo!.typedefDefinition}\n```\n',
           );
+        }
+        continue;
+      }
+
+      if (kind == 'function') {
+        final StaticMethodInfo? function =
+            apiInfo.componentInfo!.topLevelFunction;
+        if (function == null) {
+          continue;
+        }
+        sb.write('\n#### 顶层函数');
+        if (function.introduction?.isNotEmpty ?? false) {
+          sb.write('\n\n${function.introduction}');
+        }
+        final String returnType = function.returnType ?? 'dynamic';
+        sb.write('\n\n返回类型：`$returnType`');
+        if (function.params.isNotEmpty) {
+          sb.write(
+            '\n\n#### 参数\n\n'
+            '| 参数 | 类型 | 默认值 | 说明 |\n'
+            '| --- | --- | --- | --- |\n',
+          );
+          for (final PropertyInfo parameter in function.params) {
+            sb.write(
+              '| ${sanitizeTableCell(parameter.name)} | ${sanitizeTableCell(parameter.type.isEmpty ? '-' : parameter.type)} | ${sanitizeTableCell(parameter.defaultValue)} | ${sanitizeTableCell(parameter.introduction.isEmpty ? '-' : parameter.introduction)} |\n',
+            );
+          }
         }
         continue;
       }

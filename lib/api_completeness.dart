@@ -231,6 +231,106 @@ List<String> markdownCtorParamsWithEmptyType(String section) {
   return bad;
 }
 
+/// 读取顶层函数「参数」表中的参数名。
+Set<String> markdownFunctionParamNames(String section) {
+  const String header = '#### 参数';
+  if (!section.contains(header)) {
+    return <String>{};
+  }
+  final String block =
+      section.split(header).skip(1).first.split(RegExp(r'\n#### ')).first;
+  final Set<String> names = <String>{};
+  for (final String line in block.split('\n')) {
+    if (!line.startsWith('|') || line.startsWith('| ---')) {
+      continue;
+    }
+    final List<String> columns = line
+        .trim()
+        .replaceFirst('|', '')
+        .replaceFirst(RegExp(r'\|$'), '')
+        .split('|');
+    if (columns.isEmpty) {
+      continue;
+    }
+    final String name = columns.first.trim();
+    if (name.isNotEmpty && name != '参数') {
+      names.add(name);
+    }
+  }
+  return names;
+}
+
+/// 校验一个顶层函数的生成文档是否完整。
+List<CompletenessIssue> functionDocumentationIssues(
+  String componentKey,
+  ComponentInfo function,
+  String section,
+) {
+  final List<CompletenessIssue> issues = <CompletenessIssue>[];
+  final String functionName = function.name ?? '';
+  final StaticMethodInfo? signature = function.topLevelFunction;
+  if (signature == null) {
+    return <CompletenessIssue>[
+      CompletenessIssue(
+        component: componentKey,
+        level: 'ERROR',
+        category: 'tool',
+        message: '顶层函数 $functionName 缺少解析后的签名',
+      ),
+    ];
+  }
+  if (!section.contains('#### 顶层函数')) {
+    issues.add(
+      CompletenessIssue(
+        component: componentKey,
+        level: 'ERROR',
+        category: 'tool',
+        message: '顶层函数 $functionName 缺少函数说明',
+      ),
+    );
+  }
+  if (!section.contains('返回类型：`')) {
+    issues.add(
+      CompletenessIssue(
+        component: componentKey,
+        level: 'ERROR',
+        category: 'tool',
+        message: '顶层函数 $functionName 缺少返回类型',
+      ),
+    );
+  }
+
+  final Set<String> sourceParams =
+      signature.params
+          .map((PropertyInfo parameter) => parameter.name)
+          .where((String name) => name.isNotEmpty)
+          .toSet();
+  final Set<String> documentedParams = markdownFunctionParamNames(section);
+  final Set<String> missing = sourceParams.difference(documentedParams);
+  final Set<String> extra = documentedParams.difference(sourceParams);
+  if (missing.isNotEmpty) {
+    issues.add(
+      CompletenessIssue(
+        component: componentKey,
+        level: 'ERROR',
+        category: 'tool',
+        message: '顶层函数 $functionName 文档缺少参数: ${missing.toList()..sort()}',
+      ),
+    );
+  }
+  if (extra.isNotEmpty) {
+    issues.add(
+      CompletenessIssue(
+        component: componentKey,
+        level: 'WARN',
+        category: 'tool',
+        message: '顶层函数 $functionName 文档多出参数: ${extra.toList()..sort()}',
+      ),
+    );
+  }
+  return issues;
+}
+
 /// 跨文件重复 enum/typedef（返回 issue，不打印）
 List<CompletenessIssue> duplicateAuxiliaryIssues(
   String componentKey,
@@ -433,6 +533,17 @@ Future<List<CompletenessIssue>> auditComponent({
           ),
         );
       }
+      continue;
+    }
+
+    if (kind == 'function') {
+      issues.addAll(
+        functionDocumentationIssues(
+          config.componentKey,
+          info.componentInfo!,
+          section,
+        ),
+      );
       continue;
     }
 

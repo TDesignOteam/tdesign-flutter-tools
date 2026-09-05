@@ -70,8 +70,11 @@ class ComponentInfo {
   // 实例方法信息（用于 abstract class 的接口方法文档）
   List<StaticMethodInfo> instanceMethodList = [];
 
-  /// API 条目类型：class | enum | typedef
+  /// API 条目类型：class | enum | typedef | function
   String kind = 'class';
+
+  /// 顶层函数签名（仅 kind == function）
+  StaticMethodInfo? topLevelFunction;
 
   /// 枚举成员名称（仅 kind == enum）
   List<String> enumValues = [];

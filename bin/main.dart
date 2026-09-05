@@ -19,7 +19,10 @@ class CreateCommand extends Command {
     // [argParser] is automatically created by the parent class.
     argParser.addOption('file', help: '相对ui_component目录的组件文件路径');
     argParser.addOption('folder', help: '相对ui_component目录的组件文件夹路径');
-    argParser.addOption('name', help: '组件名，多个组件名之间用英文,分割');
+    argParser.addOption(
+      'name',
+      help: '需要生成的公开声明名（class/enum/typedef/顶层函数），多个名称用英文逗号分隔',
+    );
     argParser.addOption(
       'folder-name',
       help: '[可选]生成的组件示例文件夹名称,默认文件夹名称是第一项name的下划线表示',
