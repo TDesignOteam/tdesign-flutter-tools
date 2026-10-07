@@ -133,9 +133,10 @@ String formatMethodParams(List<PropertyInfo> params) {
 }
 
 /// 通用参数说明兜底（仅在源码未提供注释时生效）
-String fallbackParameterIntroduction(String name) {
+String fallbackParameterIntroduction(String name, [String type = 'Key?']) {
   switch (name) {
     case 'key':
+      if (type != 'Key' && type != 'Key?') return '';
       return '组件标识，用于区分或保留组件状态。';
     default:
       return '';

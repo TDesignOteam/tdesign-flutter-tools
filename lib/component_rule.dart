@@ -10,6 +10,24 @@ import 'util.dart';
 
 typedef OnParsedComponentInfoInfo = void Function(ParsedComponentInfoInfo info);
 
+/// Preserve declaration tokens (including generics and parameter kinds), without
+/// dartdoc/annotations or a callable implementation body.
+String declarationSignature(AnnotatedNode node, int end) {
+  Token? token = node.firstTokenAfterCommentAndMetadata;
+  final start = token.offset;
+  final buffer = StringBuffer();
+  Token? previous;
+  while (token != null && token.offset < end && !token.isEof) {
+    if (token.offset >= start) {
+      if (previous != null && previous.end < token.offset) buffer.write(' ');
+      buffer.write(token.lexeme);
+      previous = token;
+    }
+    token = token.next;
+  }
+  return buffer.toString();
+}
+
 // ignore_for_file: always_specify_types
 class ComponentRule {
   ComponentRule({
@@ -593,8 +611,8 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
     );
   }
 
-  void _fillPropertyFromFieldMap(PropertyInfo item) {
-    final PropertyInfo? field = fieldMap[item.name];
+  void _fillPropertyFromFieldMap(PropertyInfo item, {bool useField = true}) {
+    final PropertyInfo? field = useField ? fieldMap[item.name] : null;
     if (field != null) {
       if (item.type.isEmpty && field.type.isNotEmpty) {
         item.type = field.type;
@@ -604,7 +622,7 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
       }
     }
     if (item.introduction.isEmpty) {
-      item.introduction = fallbackParameterIntroduction(item.name);
+      item.introduction = fallbackParameterIntroduction(item.name, item.type);
     }
   }
 
@@ -632,7 +650,10 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
   }) {
     for (final StaticMethodInfo method in methods) {
       for (final PropertyInfo param in method.params) {
-        _fillPropertyFromFieldMap(param);
+        _fillPropertyFromFieldMap(
+          param,
+          useField: inheritParentDefault || method.name == 'copyWith',
+        );
         if ((param.defaultValue == '-' || param.defaultValue.isEmpty) &&
             inheritParentDefault &&
             _currentClassSuperName != null) {
@@ -676,6 +697,10 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
       if (_isInTargetClass) {
         componentInfo ??= ComponentInfo();
         componentInfo!.hasDefaultConstructor = true;
+        componentInfo!.defaultConstructorSignature = declarationSignature(
+          node,
+          node.parameters.end,
+        );
         componentInfo!
             .defaultConstructorIntroduction = formatDocumentationForMarkdown(
           node.documentationComment?.tokens.join('\n') ?? '',
@@ -718,6 +743,10 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
       final StaticMethodInfo staticMethodInfo = StaticMethodInfo();
       staticMethodInfo.name = constructorName;
       staticMethodInfo.isFactory = node.factoryKeyword != null;
+      staticMethodInfo.signature = declarationSignature(
+        node,
+        node.parameters.end,
+      );
       staticMethodInfo.introduction =
           node.documentationComment?.tokens.join('\n') ?? '';
       for (final FormalParameter element in node.parameters.parameters) {
@@ -834,6 +863,7 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
     final StaticMethodInfo functionInfo =
         StaticMethodInfo()
           ..name = functionName
+          ..signature = declarationSignature(node, parameters.end)
           ..returnType = node.returnType?.toSource() ?? 'dynamic'
           ..introduction = node.documentationComment?.tokens.join('\n') ?? '';
     for (final FormalParameter parameter in parameters.parameters) {
@@ -845,7 +875,10 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
         parameter.type = 'dynamic';
       }
       if (parameter.introduction.isEmpty) {
-        parameter.introduction = fallbackParameterIntroduction(parameter.name);
+        parameter.introduction = fallbackParameterIntroduction(
+          parameter.name,
+          parameter.type,
+        );
       }
     }
 
@@ -890,9 +923,14 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
     if (isTarget) {
       componentInfo ??= ComponentInfo();
       componentInfo!.name = className;
+      componentInfo!.declaration = declarationSignature(
+        node,
+        node.leftBracket.offset,
+      );
       if (node.abstractKeyword == null &&
           !node.members.any((member) => member is ConstructorDeclaration)) {
         componentInfo!.hasDefaultConstructor = true;
+        componentInfo!.defaultConstructorSignature = '$className()';
       }
       if (node.documentationComment != null) {
         componentInfo!.introduction = formatDocumentationForMarkdown(
@@ -958,6 +996,7 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
         ComponentInfo()
           ..name = name
           ..kind = 'extension'
+          ..declaration = declarationSignature(node, node.leftBracket.offset)
           ..introduction = formatDocumentationForMarkdown(
             node.documentationComment?.tokens.join('\n') ?? '',
           );
@@ -1012,7 +1051,8 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
         (node.metadata.any(
               (annotation) => annotation.name.name == 'override',
             ) &&
-            node.documentationComment == null)) {
+            node.documentationComment == null &&
+            !const {'copyWith', 'lerp', '[]'}.contains(methodName))) {
       return;
     }
 
@@ -1039,6 +1079,10 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
     }
     StaticMethodInfo methodInfo = StaticMethodInfo();
     methodInfo.name = methodName;
+    methodInfo.signature = declarationSignature(
+      node,
+      node.parameters?.end ?? node.body.offset,
+    );
     methodInfo.introduction =
         node.documentationComment?.tokens.join('\n') ?? '';
     methodInfo.returnType = node.returnType?.toSource();

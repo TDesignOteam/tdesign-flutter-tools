@@ -62,3 +62,43 @@ enum UnregisteredEnum { value }
 
 /// A generic callback.
 typedef GenericBuilder<T> = T Function(T value);
+
+/// Generic declarations and colliding parameter names.
+class DemoGeneric<T extends Object> extends _GenericBase<T> {
+  /// The current index, not a target index.
+  int get index => 0;
+
+  /// Move to a target. No parameter docs have been supplied.
+  void jump(int index) {}
+
+  /// Read a Token, not a Widget key.
+  void lookup(String? key) {}
+
+  /// Return a generic value with optional positional input.
+  T? read<E extends Object>(E value, [T? fallback]) => fallback;
+
+  @override
+  DemoGeneric<T> copyWith() => this;
+
+  @override
+  T? operator [](Object? key) => null;
+}
+
+abstract class _GenericBase<T> {
+  _GenericBase<T> copyWith();
+  T? operator [](Object? key);
+}
+
+/// A const redirecting factory has no callable body in its declaration.
+sealed class DemoRedirect {
+  /// Fixed layout.
+  const factory DemoRedirect.fixed({
+    /// Number of columns; runtime fallback is supplied by the target.
+    int count,
+  }) = _DemoFixed;
+}
+
+class _DemoFixed implements DemoRedirect {
+  const _DemoFixed({this.count = 2});
+  final int count;
+}

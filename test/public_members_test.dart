@@ -27,6 +27,8 @@ void main() {
         'DemoOptions',
         'DemoHelpers',
         'GenericBuilder',
+        'DemoGeneric',
+        'DemoRedirect',
       ];
       final infos =
           ComponentRule(parsedUnitResult: parsed, nameList: names).analyse();
@@ -58,6 +60,38 @@ void main() {
         (info) => info.componentInfo!.name == 'DemoController',
       );
       expect(controller.componentInfo!.hasDefaultConstructor, isTrue);
+      final generic = infos.firstWhere(
+        (info) => info.componentInfo!.name == 'DemoGeneric',
+      );
+      final methods = generic.componentInfo!.instanceMethodList;
+      expect(
+        methods.map((method) => method.name),
+        containsAll(['jump', 'lookup', 'read', 'copyWith', '[]']),
+      );
+      expect(
+        methods
+            .firstWhere((method) => method.name == 'jump')
+            .params
+            .single
+            .introduction,
+        isEmpty,
+      );
+      expect(
+        methods
+            .firstWhere((method) => method.name == 'lookup')
+            .params
+            .single
+            .introduction,
+        isEmpty,
+      );
+      expect(
+        methods
+            .firstWhere((method) => method.name == 'lookup')
+            .params
+            .single
+            .type,
+        'String?',
+      );
       final temp = await Directory.systemTemp.createTemp(
         'tdesign_public_members_',
       );
@@ -87,12 +121,20 @@ void main() {
         expect(html, contains('<td>List&lt;String&gt;</td>'));
         expect(html, isNot(contains('<String>')));
         expect(markdown, contains('typedef GenericBuilder<T>'));
+        expect(markdown, contains('class DemoGeneric<T extends Object>'));
+        expect(
+          markdown,
+          contains('T? read<E extends Object>(E value, [T? fallback])'),
+        );
+        expect(markdown, contains('##### DemoGeneric.copyWith'));
+        expect(markdown, contains('##### DemoGeneric.[]'));
+        expect(markdown, contains('const factory DemoRedirect.fixed('));
         expect(markdown, isNot(contains('### UnregisteredEnum')));
         expect(markdown, contains('| canClose | bool |'));
         expect(markdown, contains('##### DemoHelpers.dismiss'));
         expect(markdown, contains('#### 命名构造方法'));
         expect(markdown, contains('#### 工厂构造方法'));
-        expect(markdown, contains('`DemoController()`'));
+        expect(markdown, contains('```dart\nDemoController()\n```'));
         expect(markdown, contains('Whether closure is animated.'));
         expect(
           markdown,

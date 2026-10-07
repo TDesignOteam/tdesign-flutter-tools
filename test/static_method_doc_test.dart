@@ -54,7 +54,9 @@ Future<String> _generateFixtureApi({
       commandInfo: commandInfo,
     );
     await creator.generateApiInfoFile(infos);
-    return await File(p.join(tempDir.path, '${folderName}_api.md')).readAsString();
+    return await File(
+      p.join(tempDir.path, '${folderName}_api.md'),
+    ).readAsString();
   } finally {
     await tempDir.delete(recursive: true);
   }
@@ -306,7 +308,8 @@ void main() {
         r'### TypeAlpha[\s\S]*?\n\n### TypeBeta',
       ).firstMatch(content);
       expect(sectionGap, isNotNull);
-      expect(sectionGap!.group(0), isNot(contains('```')));
+      expect(sectionGap!.group(0), contains('class TypeAlpha'));
+      expect(content, contains('class TypeBeta'));
     });
 
     test(
@@ -322,7 +325,10 @@ void main() {
         expect(content, contains('#### 简介'));
         expect(content, contains('第一个组件说明'));
         expect(content, isNot(contains('TypeAlpha.demo()')));
-        expect(content, isNot(matches(RegExp(r'#### 简介[\s\S]*```'))));
+        expect(
+          content.split('#### 简介').last.split('\n#### ').first,
+          isNot(contains('```')),
+        );
       },
     );
 

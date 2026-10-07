@@ -69,6 +69,8 @@ class ComponentInfo {
 
   bool hasDefaultConstructor = false;
   String defaultConstructorIntroduction = '';
+  String declaration = '';
+  String defaultConstructorSignature = '';
 
   // Public instance method documentation.
   List<StaticMethodInfo> instanceMethodList = [];
@@ -267,6 +269,7 @@ class CommandInfo {
 }
 
 class StaticMethodInfo {
+  String signature = '';
   bool isFactory = false;
   // 方法名称
   String? name;

@@ -6,8 +6,11 @@ import 'dart:io';
 import 'package:analyzer/dart/analysis/analysis_context_collection.dart';
 import 'package:analyzer/file_system/physical_file_system.dart';
 import 'package:ansicolor/ansicolor.dart';
+import 'package:dart_style/dart_style.dart';
 import 'package:path/path.dart';
 import 'package:analyzer/dart/analysis/results.dart';
+import 'package:analyzer/dart/analysis/utilities.dart';
+import 'package:analyzer/dart/ast/ast.dart';
 
 import 'component_rule.dart';
 import 'documentation.dart';
@@ -423,6 +426,8 @@ class SmartCreator {
         }
         final String returnType = function.returnType ?? 'dynamic';
         sb.write('\n\n返回类型：`$returnType`');
+        if (function.signature.isNotEmpty)
+          sb.write('\n\n```dart\n${function.signature}\n```\n');
         if (function.params.isNotEmpty) {
           sb.write(
             '\n\n#### 参数\n\n'
@@ -442,6 +447,59 @@ class SmartCreator {
         sb.write('\n#### 简介\n');
         sb.write(introForSummary);
       }
+      if (apiInfo.componentInfo!.declaration.isNotEmpty)
+        sb.write(
+          '\n\n#### 声明\n\n```dart\n${apiInfo.componentInfo!.declaration}\n```\n',
+        );
+      String callableCode(String signature, {bool constructor = false}) {
+        final declaration = apiInfo.componentInfo!.declaration;
+        final factory =
+            signature.startsWith('factory ') ||
+            signature.startsWith('const factory ');
+        final suffix =
+            factory
+                ? ' = _DocumentationConstructor;'
+                : constructor
+                ? ';'
+                : ' => throw UnimplementedError();';
+        final wrapped =
+            declaration.isEmpty
+                ? '$signature$suffix'
+                : '$declaration { $signature$suffix }';
+        final formatted = DartFormatter(
+          languageVersion: DartFormatter.latestLanguageVersion,
+        ).format(wrapped);
+        final owner = parseString(content: formatted).unit.declarations.single;
+        final AnnotatedNode callable =
+            owner is ClassDeclaration
+                ? owner.members.single
+                : owner is ExtensionDeclaration
+                ? owner.members.single
+                : owner;
+        final end =
+            callable is ConstructorDeclaration
+                ? callable.parameters.end
+                : callable is MethodDeclaration
+                ? callable.parameters!.end
+                : (callable as FunctionDeclaration)
+                    .functionExpression
+                    .parameters!
+                    .end;
+        final code = formatted.substring(
+          callable.firstTokenAfterCommentAndMetadata.offset,
+          end,
+        );
+        // Remove the wrapper's indentation while preserving formatter line breaks.
+        return code.replaceAll('\n  ', '\n');
+      }
+
+      void writeSignature(String signature, {bool constructor = false}) {
+        if (signature.isNotEmpty)
+          sb.write(
+            '\n\n```dart\n${callableCode(signature, constructor: constructor)}\n```\n',
+          );
+      }
+
       StaticMethodInfo? currentMethod;
 
       void writePropertyTable(
@@ -454,11 +512,11 @@ class SmartCreator {
         }
         sb.write('\n#### $header');
         sb.write('''\n
-| $nameColumn | 类型 | 默认值 | 说明 |${header == '默认构造方法' ? ' 必填 |' : ''}
-| --- | --- | --- | --- |${header == '默认构造方法' ? ' --- |' : ''}\n''');
+| $nameColumn | 类型 | 默认值 | 说明 |${header == '参数' ? ' 必填 |' : ''}
+| --- | --- | --- | --- |${header == '参数' ? ' --- |' : ''}\n''');
         for (final PropertyInfo item in items) {
           sb.write(
-            '''| ${sanitizeTableCell(item.name)} | ${sanitizeApiType(item.type.isEmpty ? '-' : item.type)} | ${sanitizeApiType(item.defaultValue)} | ${sanitizeTableCell(item.introduction.isEmpty ? '-' : item.introduction)} |${header == '默认构造方法' ? ' ${item.isRequired ? '是' : '否'} |' : ''}\n''',
+            '''| ${sanitizeTableCell(item.name)} | ${sanitizeApiType(item.type.isEmpty ? '-' : item.type)} | ${sanitizeApiType(item.defaultValue)} | ${sanitizeTableCell(item.introduction.isEmpty ? '-' : item.introduction)} |${header == '参数' ? ' ${item.isRequired ? '是' : '否'} |' : ''}\n''',
           );
         }
       }
@@ -543,7 +601,6 @@ class SmartCreator {
         List<StaticMethodInfo> methods, {
         required String header,
         bool includeReturnType = false,
-        bool compactCommonForwardedParams = false,
       }) {
         if (methods.isEmpty) {
           return;
@@ -553,58 +610,12 @@ class SmartCreator {
           (StaticMethodInfo a, StaticMethodInfo b) =>
               a.name!.toLowerCase().compareTo(b.name!.toLowerCase()),
         );
-        final Set<String> commonForwardedParams = <String>{};
-        if (compactCommonForwardedParams && methods.length > 1) {
-          Set<String>? common;
-          for (final StaticMethodInfo method in methods) {
-            final bool hasForwardedInfo =
-                method.forwardedTargetName == apiInfo.componentInfo!.name &&
-                (method.forwardedConstructorName == null ||
-                    method.forwardedConstructorName!.isEmpty);
-            if (!hasForwardedInfo) {
-              common = <String>{};
-              break;
-            }
-            final Set<String> forwardedCurrent =
-                method.params
-                    .where(
-                      (PropertyInfo param) =>
-                          method.forwardedParamMap[param.name] == param.name,
-                    )
-                    .map((PropertyInfo p) => p.name)
-                    .toSet();
-            common =
-                common == null
-                    ? forwardedCurrent
-                    : common.intersection(forwardedCurrent);
-            if (common.isEmpty) {
-              break;
-            }
-          }
-          if (common != null && common.isNotEmpty) {
-            commonForwardedParams.addAll(common);
-            final List<PropertyInfo> commonParamRows =
-                methods.first.params
-                    .where(
-                      (PropertyInfo param) =>
-                          commonForwardedParams.contains(param.name),
-                    )
-                    .toList()
-                  ..sort(
-                    (PropertyInfo a, PropertyInfo b) =>
-                        a.name.toLowerCase().compareTo(b.name.toLowerCase()),
-                  );
-            currentMethod = methods.first;
-            sb.write('\n\n##### 通用参数');
-            sb.write('\n\n以下参数由各命名工厂统一透传，含义一致：');
-            writeMethodParamTable(commonParamRows);
-          }
-        }
         for (final StaticMethodInfo item in methods) {
           currentMethod = item;
           sb.write(
             '\n\n##### ${apiInfo.componentInfo!.name}.${sanitizeTableCell(item.name)}',
           );
+          writeSignature(item.signature, constructor: header.contains('构造方法'));
           if (item.introduction != null && item.introduction!.isNotEmpty) {
             sb.write('\n\n${item.introduction}');
           }
@@ -613,19 +624,7 @@ class SmartCreator {
           if (includeReturnType && returnType.isNotEmpty) {
             sb.write('\n\n返回类型：`$returnType`');
           }
-          final List<PropertyInfo> params =
-              commonForwardedParams.isEmpty
-                  ? item.params
-                  : item.params
-                      .where(
-                        (PropertyInfo param) =>
-                            !commonForwardedParams.contains(param.name),
-                      )
-                      .toList();
-          if (commonForwardedParams.isNotEmpty) {
-            sb.write('\n\n其余参数见「通用参数」。');
-          }
-          writeMethodParamTable(params);
+          writeMethodParamTable(item.params);
         }
         currentMethod = null;
       }
@@ -649,18 +648,19 @@ class SmartCreator {
         writeMethodDetails(
           publicNamedConstructors.where((method) => method.isFactory).toList(),
           header: '工厂构造方法',
-          compactCommonForwardedParams: true,
         );
       }
       writeMethodDetails(
         publicNamedConstructors.where((method) => !method.isFactory).toList(),
         header: '命名构造方法',
-        compactCommonForwardedParams: true,
       );
       if (apiInfo.componentInfo!.hasDefaultConstructor &&
           apiInfo.propertyList.isEmpty) {
         sb.write('\n#### 默认构造方法\n');
-        sb.write('`${apiInfo.componentInfo!.name}()`\n');
+        writeSignature(
+          apiInfo.componentInfo!.defaultConstructorSignature,
+          constructor: true,
+        );
         final String docs =
             apiInfo.componentInfo!.defaultConstructorIntroduction;
         if (docs.isNotEmpty) sb.write('\n$docs\n');
@@ -679,7 +679,12 @@ class SmartCreator {
             element.introduction = field.introduction;
           }
         }
-        writePropertyTable(apiInfo.propertyList, header: '默认构造方法');
+        sb.write('\n#### 默认构造方法\n');
+        writeSignature(
+          apiInfo.componentInfo!.defaultConstructorSignature,
+          constructor: true,
+        );
+        writePropertyTable(apiInfo.propertyList, header: '参数');
       }
       writePropertyTable(
         apiInfo.extraPropertyList,
