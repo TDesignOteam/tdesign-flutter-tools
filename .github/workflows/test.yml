@@ -1,0 +1,36 @@
+name: Tools Regression
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: test (${{ matrix.label }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: '3.32.0'
+            flutter-version: '3.32.0'
+          - label: latest
+            flutter-version: ''
+    env:
+      TDESIGN_COMPONENT_ROOT: ${{ github.workspace }}/tdesign-flutter/tdesign-component
+    steps:
+      - uses: actions/checkout@v6
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ matrix.flutter-version }}
+          cache: true
+      - run: flutter pub get
+      - run: dart analyze --fatal-infos
+      - run: git clone --depth 1 --branch develop https://github.com/Tencent/tdesign-flutter.git tdesign-flutter
+      - name: Run complete tools suite including CLI roundtrip
+        run: DART_SDK="$FLUTTER_ROOT/bin/cache/dart-sdk" dart test --reporter expanded

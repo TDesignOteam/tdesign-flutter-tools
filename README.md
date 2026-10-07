@@ -16,6 +16,7 @@
 3. **参数说明写在「方法注释」或「字段注释」**
    - 顶层函数 / 静态方法 / 工厂 / 构造：推荐在该方法的 `///` 里写 `[paramName] 说明`。
    - 构造参数：也可写在同名字段的 `///` 上。
+   - 参数声明前的行内 `///` 也会读取，包含带默认值的命名参数。
    - 无注释时表格「说明」列为 `-`，属预期，应在源码补全，**不要**在工具里打补丁。
 
 4. **不要把静态方法参数表只写在类简介里**
@@ -31,12 +32,19 @@
 
 7. **顶层函数需在 `--name` 中显式列出**
    工具会为任意公开顶层函数生成独立 API 区块，包含返回类型、参数类型、默认值和 dartdoc；私有函数、getter、setter 以及未登记函数不会被收录。
+   维护组件清单时加 `--strict-names`，只输出 `--name` 中登记的声明，避免同文件辅助枚举或 typedef 混入其他组件文档。文件夹扫描会递归读取 `.dart` 源文件。
+
+   公开普通实例方法、字段访问器、命名/工厂/无参构造与命名 extension 均会展示；Flutter 构建钩子、未自行补充文档的标准继承 override、`@internal` 和 `@visibleForTesting` 成员不收录。默认值保留声明值，Theme / Token 回退由源码注释说明；构造及方法参数另列是否必填。泛型在 Markdown 表格中转义，保留网页与 Demo 中的完整类型。类/extension 与可调用声明另外输出源码签名，包含泛型约束、位置/命名参数、默认值及 const/factory 标记；每个构造或方法独立列出完整参数。自定义 copyWith/lerp/Token 查询运算符会展示，即使源码尚未补注释也不会静默遗漏。参数说明仅从源码注释、构造/复制字段或 AST 可证明的透传获取；Widget key 的兜底说明仅适用于 Key/Key?，不会套用到 Token 的 String/Object 键。
 
 8. **不对个别组件做特殊兼容**
    工具只保留单一 AST / dartdoc 解析路线；注释位置或格式不对，应在 `tdesign-component` 修正。
 
-9. **CI 抽测清单见 `.github/config/tdesign_api.yaml`**
-   本地 `validate` 与 CI 使用同一配置；`ERROR` 需为 0，`WARN` 多为 enum 成员缺注释等源码问题。
+   解析（`component_rule.dart`）、框架成员筛选（`public_member_policy.dart`）、签名格式化（`api_signature.dart`）与 Markdown 渲染（`api_markdown.dart`）分别维护。渲染不修改解析模型；构造/工厂/external 按 AST 标记处理。仅过滤能由所属基类识别的框架钩子，业务 `build` 和普通接口 `override` 不会因名字或缺注释被隐藏。函数类型参数保留完整类型；无法从源码推断的父类/字段类型显示 `-`，不伪造 `dynamic`。代码单元格保留字符串空白并转义 HTML 实体。
+
+   默认构造参数使用五级子标题，`validate` 同时兼容既有的四级参数标题。CI 在 Flutter 3.32.0 与 latest 下运行完整工具单测，包含真实 CLI generate → validate 正例及删参数反例。
+
+9. **生成与验收共用消费仓库 `tool/components.json`**
+   `validate --component-root ...` 默认验收完整 manifest，支持 file/folder、声明及顶层函数。仍可用 `--config` 指定原有 YAML/JSON 抽测清单；`ERROR` 需为 0，`WARN` 多为 enum 成员缺注释等源码问题。
 
 ## 快速开始
 
@@ -70,12 +78,12 @@ cd $TOOLS
 
 dart run bin/main.dart validate \
   --component-root $COMPONENT \
-  --config .github/config/tdesign_api.yaml
+  --config $COMPONENT/tool/components.json
 
 # 仅测部分组件
 dart run bin/main.dart validate \
   --component-root $COMPONENT \
-  --config .github/config/tdesign_api.yaml \
+  --config $COMPONENT/tool/components.json \
   --components button,popup
 ```
 
@@ -183,7 +191,7 @@ dart run bin/main.dart generate \
 ```bash
 dart run bin/main.dart validate \
   --component-root <tdesign-component> \
-  --config .github/config/tdesign_api.yaml \
+  --config $COMPONENT/tool/components.json \
   [--components button,popup]
 ```
 

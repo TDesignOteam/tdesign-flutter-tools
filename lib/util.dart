@@ -26,7 +26,8 @@ String formalParameterName(FormalParameter param) {
 }
 
 /// Dart 库级私有命名构造（如 `ClassName._`），不应对外 API 文档展示。
-bool isLibraryPrivateNamedConstructor(String? name) => name == '_';
+bool isLibraryPrivateNamedConstructor(String? name) =>
+    name?.startsWith('_') ?? false;
 
 /// 从构造/方法参数 AST 提取类型字符串
 String extractFormalParameterType(
@@ -38,7 +39,10 @@ String extractFormalParameterType(
     target = param.parameter;
   }
   if (target is SimpleFormalParameter) {
-    return target.type?.toString() ?? '';
+    return target.type?.toString() ?? 'dynamic';
+  }
+  if (target is FunctionTypedFormalParameter) {
+    return '${target.returnType?.toSource() ?? 'dynamic'} Function${target.typeParameters?.toSource() ?? ''}${target.parameters.toSource()}${target.question == null ? '' : '?'}';
   }
   if (target is FieldFormalParameter) {
     return target.type?.toString() ?? '';
@@ -103,6 +107,19 @@ String sanitizeTableCell(String? text) {
       .trim();
 }
 
+/// Preserve Dart generics when Markdown interprets angle brackets as HTML.
+String sanitizeApiType(String type) =>
+    type.isEmpty
+        ? '-'
+        : type
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('|', r'\|')
+            .replaceAll('\r', '&#13;')
+            .replaceAll('\n', '&#10;')
+            .replaceAll('\t', '&#9;');
+
 /// 格式化方法参数列表，便于写入 Markdown 表格
 String formatMethodParams(List<PropertyInfo> params) {
   if (params.isEmpty) {
@@ -128,9 +145,10 @@ String formatMethodParams(List<PropertyInfo> params) {
 }
 
 /// 通用参数说明兜底（仅在源码未提供注释时生效）
-String fallbackParameterIntroduction(String name) {
+String fallbackParameterIntroduction(String name, [String type = 'Key?']) {
   switch (name) {
     case 'key':
+      if (type != 'Key' && type != 'Key?') return '';
       return '组件标识，用于区分或保留组件状态。';
     default:
       return '';

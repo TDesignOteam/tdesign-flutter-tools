@@ -28,6 +28,7 @@ class ComponentAuditConfig {
     required this.classNames,
     required this.sourceFolder,
     required this.folderName,
+    this.sourceIsFile = false,
   });
 
   final String componentKey;
@@ -36,6 +37,7 @@ class ComponentAuditConfig {
   /// 相对 component 根目录，如 lib/src/components/picker
   final String sourceFolder;
   final String folderName;
+  final bool sourceIsFile;
 }
 
 /// 从 YAML/JSON 配置文件加载审计清单（components 节点）
@@ -47,6 +49,30 @@ Future<List<ComponentAuditConfig>> loadAuditConfigsFromFile(String path) async {
   final String content = await file.readAsString();
   if (path.endsWith('.json')) {
     final dynamic decoded = jsonDecode(content);
+    if (decoded is Map<String, dynamic> && decoded['components'] is List) {
+      if (decoded['schemaVersion'] != 1)
+        throw ArgumentError('Unsupported manifest schema: $path');
+      return (decoded['components'] as List).map((dynamic item) {
+        final component = Map<String, dynamic>.from(item as Map);
+        final source = Map<String, dynamic>.from(component['source'] as Map);
+        final api = Map<String, dynamic>.from(component['api'] as Map);
+        final names = <String>[
+          ...(api['names'] as List).cast<String>(),
+          ...?(api['functions'] as List?)?.cast<String>(),
+        ];
+        if (names.isEmpty || !const {'file', 'folder'}.contains(source['type']))
+          throw ArgumentError(
+            'Invalid component manifest entry: ${component['slug']}',
+          );
+        return ComponentAuditConfig(
+          componentKey: component['slug'] as String,
+          classNames: names,
+          sourceFolder: source['path'] as String,
+          sourceIsFile: source['type'] == 'file',
+          folderName: component['slug'] as String,
+        );
+      }).toList();
+    }
     if (decoded is Map<String, dynamic> && decoded['components'] is Map) {
       return _configsFromMap(
         Map<String, dynamic>.from(decoded['components'] as Map),
@@ -153,8 +179,10 @@ List<ComponentAuditConfig> _configsFromYaml(String yaml) {
   );
 }
 
-/// 默认审计配置路径（相对 tools 仓库根目录）
-String defaultAuditConfigPath() => '.github/config/tdesign_api.yaml';
+/// Reuse the consuming component's manifest instead of a separate audit list.
+String defaultAuditConfigPath({
+  String componentRoot = '../tdesign-flutter/tdesign-component',
+}) => p.join(componentRoot, 'tool', 'components.json');
 
 /// 从 Markdown API 文档解析 {类名: section 正文}
 Map<String, String> parseMarkdownSections(String markdown) {
@@ -168,14 +196,28 @@ Map<String, String> parseMarkdownSections(String markdown) {
   return sections;
 }
 
+/// Accept current child headings and the former sibling parameter heading.
+/// Headings inside declaration code fences do not delimit the section.
+String _defaultConstructorBlock(String section) {
+  final lines = section.split('\n');
+  final start = lines.indexWhere((line) => line.trim() == '#### 默认构造方法');
+  if (start < 0) return '';
+  final result = <String>[];
+  var inCode = false;
+  for (final line in lines.skip(start + 1)) {
+    if (line.trimLeft().startsWith('```')) inCode = !inCode;
+    if (!inCode) {
+      final heading = RegExp(r'^(#{1,4})\s+(.+)$').firstMatch(line);
+      if (heading != null && line.trim() != '#### 参数') break;
+    }
+    result.add(line);
+  }
+  return result.join('\n');
+}
+
 /// 读取「默认构造方法」表格中的参数名（不含公开属性 / 静态成员表）
 Set<String> markdownDefaultCtorParamNames(String section) {
-  const String header = '#### 默认构造方法';
-  if (!section.contains(header)) {
-    return <String>{};
-  }
-  final String block =
-      section.split(header).skip(1).first.split(RegExp(r'\n#### ')).first;
+  final String block = _defaultConstructorBlock(section);
   final Set<String> names = <String>{};
   for (final String line in block.split('\n')) {
     if (!line.startsWith('|') || line.startsWith('| ---')) {
@@ -200,12 +242,7 @@ Set<String> markdownDefaultCtorParamNames(String section) {
 
 /// 构造表中类型列为 `-` 的参数名
 List<String> markdownCtorParamsWithEmptyType(String section) {
-  const String header = '#### 默认构造方法';
-  if (!section.contains(header)) {
-    return <String>[];
-  }
-  final String block =
-      section.split(header).skip(1).first.split(RegExp(r'\n#### ')).first;
+  final String block = _defaultConstructorBlock(section);
   final List<String> bad = <String>[];
   for (final String line in block.split('\n')) {
     if (!line.startsWith('|') || line.startsWith('| ---')) {
@@ -449,7 +486,7 @@ Future<List<CompletenessIssue>> auditComponent({
           : '$root${Platform.pathSeparator}';
 
   final List<ParsedComponentInfoInfo> parsed = await SmartCreator(
-    isFileMode: false,
+    isFileMode: config.sourceIsFile,
     onlyApi: true,
     nameList: config.classNames,
     basePath: basePath,
@@ -630,13 +667,13 @@ Future<int> runCompletenessAudit({
   final List<ComponentAuditConfig> auditConfigs =
       configs ??
       await loadAuditConfigsFromFile(
-        p.join(Directory.current.path, defaultAuditConfigPath()),
+        defaultAuditConfigPath(componentRoot: componentRoot),
       );
   int errorCount = 0;
   int warnCount = 0;
 
   stdout.writeln('=' * 60);
-  stdout.writeln('API 文档完备性检测（analyzer AST，5 组件）');
+  stdout.writeln('API 文档完备性检测（analyzer AST，${auditConfigs.length} 组件）');
   stdout.writeln('=' * 60);
 
   for (final ComponentAuditConfig config in auditConfigs) {

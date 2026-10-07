@@ -24,25 +24,37 @@ void main() {
         'class AWidget {}\ntypedef ATypedef = void Function();\n',
       );
 
+      final Directory nested = Directory(p.join(tempDir.path, 'nested'));
+      await nested.create();
+      await File(
+        p.join(nested.path, 'nested.dart'),
+      ).writeAsString('class NestedWidget {}');
+      await File(p.join(tempDir.path, 'ignore.txt')).writeAsString('not Dart');
+
       final SmartCreator creator = SmartCreator(
         isFileMode: false,
         onlyApi: true,
-        nameList: <String>['AWidget', 'ZWidget'],
+        nameList: <String>['AWidget', 'ZWidget', 'NestedWidget'],
         basePath: tempDir.path,
         path: '',
         folderName: 'order',
       );
 
-      final List<ParsedComponentInfoInfo> parsed =
-          await creator.parseOnly(quiet: true);
+      final List<ParsedComponentInfoInfo> parsed = await creator.parseOnly(
+        quiet: true,
+      );
 
-      final List<String> names = parsed
-          .map((ParsedComponentInfoInfo e) => e.componentInfo!.name!)
-          .where((String n) => n.isNotEmpty)
-          .toList();
+      final List<String> names =
+          parsed
+              .map((ParsedComponentInfoInfo e) => e.componentInfo!.name!)
+              .where((String n) => n.isNotEmpty)
+              .toList();
 
       // 两个目标类都出现，且字母序文件（a 在 z 之前）先生成。
-      expect(names, containsAll(<String>['AWidget', 'ZWidget']));
+      expect(
+        names,
+        containsAll(<String>['AWidget', 'ZWidget', 'NestedWidget']),
+      );
       expect(names.indexOf('AWidget'), lessThan(names.indexOf('ZWidget')));
     } finally {
       await tempDir.delete(recursive: true);

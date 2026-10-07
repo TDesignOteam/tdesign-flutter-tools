@@ -1,3 +1,5 @@
+import 'api_signature.dart';
+
 //组件信息
 // import 'package:component_info/component_info.dart';
 
@@ -67,7 +69,14 @@ class ComponentInfo {
   // 其他构造方法信息
   List<StaticMethodInfo> constructorMethodList = [];
 
-  // 实例方法信息（用于 abstract class 的接口方法文档）
+  bool hasDefaultConstructor = false;
+  String defaultConstructorIntroduction = '';
+  String declaration = '';
+  String defaultConstructorSignature = '';
+  ApiCallableKind defaultConstructorKind = ApiCallableKind.constructor;
+  bool defaultConstructorIsExternal = false;
+
+  // Public instance method documentation.
   List<StaticMethodInfo> instanceMethodList = [];
 
   /// API 条目类型：class | enum | typedef | function
@@ -214,6 +223,7 @@ class ParsedComponentInfoInfo {
 
 // 用户执行的命令
 class CommandInfo {
+  bool strictNames = false;
   String? file;
   String? folder;
   String? widgetNames;
@@ -263,6 +273,10 @@ class CommandInfo {
 }
 
 class StaticMethodInfo {
+  String signature = '';
+  ApiCallableKind callableKind = ApiCallableKind.method;
+  bool isExternal = false;
+  bool isFactory = false;
   // 方法名称
   String? name;
 
