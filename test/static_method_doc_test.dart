@@ -54,7 +54,7 @@ Future<String> _generateFixtureApi({
       commandInfo: commandInfo,
     );
     await creator.generateApiInfoFile(infos);
-    return File(p.join(tempDir.path, '${folderName}_api.md')).readAsString();
+    return await File(p.join(tempDir.path, '${folderName}_api.md')).readAsString();
   } finally {
     await tempDir.delete(recursive: true);
   }

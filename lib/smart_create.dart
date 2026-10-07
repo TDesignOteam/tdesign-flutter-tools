@@ -37,33 +37,9 @@ class SmartCreator {
   final CommandInfo? commandInfo;
 
   Future<void> run() async {
-    List<String> files = <String>[];
-    if (isFileMode!) {
-      String filePath = join(basePath!, path);
-      filePath = normalize(filePath);
-      files.add(filePath);
-      File file = File(files[0]);
-      if (!file.existsSync()) {
-        AnsiPen pen = AnsiPen()..red(bold: true);
-        print(pen('源文件路径不对: ${files[0]}'));
-        return;
-      }
-    } else {
-      String fullPath = join(basePath!, path);
-      fullPath = normalize(fullPath);
-      Directory comDir = Directory(fullPath);
-      if (comDir.existsSync()) {
-        List<FileSystemEntity> filesInDir = comDir.listSync();
-        for (final item in filesInDir) {
-          files.add(item.path);
-        }
-        // Directory.listSync() 不保证目录顺序，排序以确保生成的 *_api.md 内容顺序固定、可复现。
-        files.sort();
-      } else {
-        AnsiPen pen = AnsiPen()..red(bold: true);
-        print(pen('输入的文件夹路径不对: $fullPath'));
-      }
-    }
+    final List<String> files = _collectSourceFiles();
+    if (files.isEmpty)
+      throw ArgumentError('No Dart sources found: ${join(basePath!, path)}');
     int startTime = DateTime.now().microsecondsSinceEpoch;
     // print('${DateTime.now().toLocal()}  AnalysisContextCollection');]
     var sb = StringBuffer();
@@ -149,8 +125,11 @@ class SmartCreator {
       final String fullPath = normalize(join(basePath!, path));
       final Directory comDir = Directory(fullPath);
       if (comDir.existsSync()) {
-        for (final FileSystemEntity item in comDir.listSync()) {
-          if (item.path.endsWith('.dart')) {
+        for (final FileSystemEntity item in comDir.listSync(
+          recursive: true,
+          followLinks: false,
+        )) {
+          if (item is File && item.path.endsWith('.dart')) {
             files.add(item.path);
           }
         }
@@ -344,9 +323,18 @@ class SmartCreator {
     await file.create(recursive: false);
     String fileContent = '''
 ## API
+
+默认值列展示源码声明的默认值；`-` 表示未显式声明。运行时的 Theme / Token 回退见说明，参数是否必填见「必填」列。
+
 ''';
     StringBuffer sb = StringBuffer(fileContent);
-    for (final apiInfo in parsedComponentInfoList) {
+    final List<ParsedComponentInfoInfo> documentedInfos =
+        commandInfo?.strictNames == true
+            ? parsedComponentInfoList
+                .where((info) => nameList!.contains(info.componentInfo?.name))
+                .toList()
+            : parsedComponentInfoList;
+    for (final apiInfo in documentedInfos) {
       if (parsedComponentInfoList.indexOf(apiInfo) >= 1) {
         sb.write('\n\n');
       }
@@ -365,7 +353,8 @@ class SmartCreator {
         }
         final List<EnumMemberInfo> enumMembers =
             apiInfo.componentInfo!.enumMembers;
-        final bool isSimpleEnum = apiInfo.componentInfo!.isSimpleEnum;
+        final bool isSimpleEnum =
+            apiInfo.componentInfo!.isSimpleEnum && !showIntro;
         if (enumMembers.isNotEmpty) {
           sb.write('\n#### 枚举值\n');
           if (isSimpleEnum) {
@@ -437,12 +426,12 @@ class SmartCreator {
         if (function.params.isNotEmpty) {
           sb.write(
             '\n\n#### 参数\n\n'
-            '| 参数 | 类型 | 默认值 | 说明 |\n'
-            '| --- | --- | --- | --- |\n',
+            '| 参数 | 类型 | 默认值 | 说明 | 必填 |\n'
+            '| --- | --- | --- | --- | --- |\n',
           );
           for (final PropertyInfo parameter in function.params) {
             sb.write(
-              '| ${sanitizeTableCell(parameter.name)} | ${sanitizeTableCell(parameter.type.isEmpty ? '-' : parameter.type)} | ${sanitizeTableCell(parameter.defaultValue)} | ${sanitizeTableCell(parameter.introduction.isEmpty ? '-' : parameter.introduction)} |\n',
+              '| ${sanitizeTableCell(parameter.name)} | ${sanitizeApiType(parameter.type.isEmpty ? '-' : parameter.type)} | ${sanitizeApiType(parameter.defaultValue)} | ${sanitizeTableCell(parameter.introduction.isEmpty ? '-' : parameter.introduction)} | ${parameter.isRequired ? '是' : '否'} |\n',
             );
           }
         }
@@ -465,11 +454,11 @@ class SmartCreator {
         }
         sb.write('\n#### $header');
         sb.write('''\n
-| $nameColumn | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- |\n''');
+| $nameColumn | 类型 | 默认值 | 说明 |${header == '默认构造方法' ? ' 必填 |' : ''}
+| --- | --- | --- | --- |${header == '默认构造方法' ? ' --- |' : ''}\n''');
         for (final PropertyInfo item in items) {
           sb.write(
-            '''| ${sanitizeTableCell(item.name)} | ${sanitizeTableCell(item.type.isEmpty ? '-' : item.type)} | ${sanitizeTableCell(item.defaultValue)} | ${sanitizeTableCell(item.introduction.isEmpty ? '-' : item.introduction)} |\n''',
+            '''| ${sanitizeTableCell(item.name)} | ${sanitizeApiType(item.type.isEmpty ? '-' : item.type)} | ${sanitizeApiType(item.defaultValue)} | ${sanitizeTableCell(item.introduction.isEmpty ? '-' : item.introduction)} |${header == '默认构造方法' ? ' ${item.isRequired ? '是' : '否'} |' : ''}\n''',
           );
         }
       }
@@ -526,8 +515,8 @@ class SmartCreator {
           return;
         }
         sb.write('''\n
-| 参数 | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- |\n''');
+| 参数 | 类型 | 默认值 | 说明 | 必填 |
+| --- | --- | --- | --- | --- |\n''');
         for (final PropertyInfo param in params) {
           PropertyInfo? forwardedParam;
           if (currentMethod != null) {
@@ -545,7 +534,7 @@ class SmartCreator {
                   ? forwardedParam.introduction
                   : param.introduction;
           sb.write(
-            '''| ${sanitizeTableCell(param.name)} | ${sanitizeTableCell(type.isEmpty ? '-' : type)} | ${sanitizeTableCell(param.defaultValue)} | ${sanitizeTableCell(introduction.isEmpty ? '-' : introduction)} |\n''',
+            '''| ${sanitizeTableCell(param.name)} | ${sanitizeApiType(type.isEmpty ? '-' : type)} | ${sanitizeApiType(param.defaultValue)} | ${sanitizeTableCell(introduction.isEmpty ? '-' : introduction)} | ${param.isRequired ? '是' : '否'} |\n''',
           );
         }
       }
@@ -658,10 +647,23 @@ class SmartCreator {
               .toList();
       if (publicNamedConstructors.isNotEmpty) {
         writeMethodDetails(
-          publicNamedConstructors,
+          publicNamedConstructors.where((method) => method.isFactory).toList(),
           header: '工厂构造方法',
           compactCommonForwardedParams: true,
         );
+      }
+      writeMethodDetails(
+        publicNamedConstructors.where((method) => !method.isFactory).toList(),
+        header: '命名构造方法',
+        compactCommonForwardedParams: true,
+      );
+      if (apiInfo.componentInfo!.hasDefaultConstructor &&
+          apiInfo.propertyList.isEmpty) {
+        sb.write('\n#### 默认构造方法\n');
+        sb.write('`${apiInfo.componentInfo!.name}()`\n');
+        final String docs =
+            apiInfo.componentInfo!.defaultConstructorIntroduction;
+        if (docs.isNotEmpty) sb.write('\n$docs\n');
       }
       if (apiInfo.propertyList.isNotEmpty) {
         // 用 fieldMap 补全构造参数缺失的类型和说明
@@ -681,7 +683,7 @@ class SmartCreator {
       }
       writePropertyTable(
         apiInfo.extraPropertyList,
-        header: '公开属性',
+        header: '公开属性（字段与访问器）',
         nameColumn: '属性',
       );
       writePropertyTable(
@@ -689,20 +691,11 @@ class SmartCreator {
         header: '静态成员',
         nameColumn: '名称',
       );
-      if (apiInfo.componentInfo?.instanceMethodList.isNotEmpty ?? false) {
-        sb.write("\n\n");
-        sb.write("#### 方法");
-        sb.write('''\n
-| 名称 | 返回类型 | 参数 | 说明 |
-| --- | --- | --- | --- |\n''');
-        for (final item in apiInfo.componentInfo!.instanceMethodList) {
-          final returnType =
-              item.returnType == "null" ? "" : (item.returnType ?? "");
-          sb.write(
-            '| ${sanitizeTableCell(item.name)} | ${sanitizeTableCell(returnType)} | ${sanitizeTableCell(formatMethodParams(item.params))} | ${sanitizeTableCell(item.introduction == null || item.introduction!.isEmpty ? '-' : item.introduction)} |\n',
-          );
-        }
-      }
+      writeMethodDetails(
+        apiInfo.componentInfo!.instanceMethodList,
+        header: '实例方法',
+        includeReturnType: true,
+      );
     }
     await file.writeAsString(sb.toString(), encoding: utf8);
     int endTime = DateTime.now().microsecondsSinceEpoch;

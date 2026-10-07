@@ -48,10 +48,10 @@ void main() {
   test('TPopupOptions default ctor captures field defaults on develop', () {
     final list = _analysePopupPart(['TPopupOptions'], 't_popup_options.dart');
     final info = list.first;
-    final showOverlay = info.propertyList.firstWhere(
-      (PropertyInfo p) => p.name == 'showOverlay',
+    final destroyOnClose = info.propertyList.firstWhere(
+      (PropertyInfo p) => p.name == 'destroyOnClose',
     );
-    expect(showOverlay.defaultValue, 'true');
+    expect(destroyOnClose.defaultValue, 'false');
   });
 
   test('TPopupBasePanel ctor captures field defaults', () {

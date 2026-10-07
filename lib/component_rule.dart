@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
+import 'package:analyzer/dart/ast/token.dart';
 import 'documentation.dart';
 import 'model.dart';
 import 'util.dart';
@@ -167,8 +168,7 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
         ComponentInfo()
           ..name = name
           ..kind = 'typedef'
-          ..typedefDefinition =
-              'typedef ${node.name.lexeme} = ${node.type.toSource()};';
+          ..typedefDefinition = node.toSource();
     if (node.documentationComment != null) {
       componentInfo.introduction = formatDocumentationForMarkdown(
         node.documentationComment!.tokens.join('\n'),
@@ -279,7 +279,14 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
       );
       return parsed.narrative;
     }
-    return '';
+    final List<String> comments = <String>[];
+    Token? token = param.beginToken.precedingComments;
+    while (token != null) {
+      if (token.lexeme.startsWith('///') || token.lexeme.startsWith('/**'))
+        comments.add(token.lexeme);
+      token = token.next;
+    }
+    return parseDocumentation(comments.join('\n')).narrative;
   }
 
   void _captureExplicitForwarding(
@@ -638,7 +645,7 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
           }
         }
         if (param.type.isEmpty) {
-          param.type = '-';
+          param.type = 'dynamic';
         }
       }
     }
@@ -666,6 +673,14 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
     }
     node.visitChildren(this);
     if (node.name == null) {
+      if (_isInTargetClass) {
+        componentInfo ??= ComponentInfo();
+        componentInfo!.hasDefaultConstructor = true;
+        componentInfo!
+            .defaultConstructorIntroduction = formatDocumentationForMarkdown(
+          node.documentationComment?.tokens.join('\n') ?? '',
+        );
+      }
       final ParsedDocumentation constructorDocs = parseDocumentation(
         node.documentationComment?.tokens.join('\n') ?? '',
         parameterNames: node.parameters.parameters
@@ -702,6 +717,7 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
       // 记录命名/工厂构造方法
       final StaticMethodInfo staticMethodInfo = StaticMethodInfo();
       staticMethodInfo.name = constructorName;
+      staticMethodInfo.isFactory = node.factoryKeyword != null;
       staticMethodInfo.introduction =
           node.documentationComment?.tokens.join('\n') ?? '';
       for (final FormalParameter element in node.parameters.parameters) {
@@ -721,26 +737,43 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
       return;
     }
     node.visitChildren(this);
-    String fieldName = node.fields.variables.join(',');
-    if (fieldName.contains('=')) {
-      fieldName = fieldName.split('=')[0].trim();
-    }
-    if (fieldName.startsWith('_')) {
+    if (node.metadata.any(
+      (annotation) =>
+          annotation.name.name == 'internal' ||
+          annotation.name.name == 'visibleForTesting',
+    ))
       return;
-    }
-    PropertyInfo? item = fieldMap[fieldName];
-    item ??= PropertyInfo()..name = fieldName;
-    fieldMap[fieldName] = item;
-    item.isStatic = node.staticKeyword != null;
-    item.type = node.fields.type?.toString() ?? '';
-    if (node.documentationComment != null) {
-      item.introduction = formatDocumentationForMarkdown(
-        node.documentationComment!.tokens.join('\n'),
-      );
-    } else if (node.beginToken.toString().startsWith('///')) {
-      item.introduction = formatDocumentationForMarkdown(
-        node.beginToken.toString(),
-      );
+    for (final variable in node.fields.variables) {
+      String fieldName = variable.name.lexeme;
+      if (fieldName.contains('=')) {
+        fieldName = fieldName.split('=')[0].trim();
+      }
+      if (fieldName.startsWith('_')) {
+        continue;
+      }
+      PropertyInfo? item = fieldMap[fieldName];
+      item ??= PropertyInfo()..name = fieldName;
+      fieldMap[fieldName] = item;
+      item.isStatic = node.staticKeyword != null;
+      item.type =
+          node.fields.type?.toString() ??
+          inferExpressionType(variable.initializer);
+      if (variable.initializer != null) {
+        item.defaultValue = formatDefaultValueForDoc(
+          variable.initializer!.toSource(),
+          paramName: fieldName,
+          isRequired: false,
+        );
+      }
+      if (node.documentationComment != null) {
+        item.introduction = formatDocumentationForMarkdown(
+          node.documentationComment!.tokens.join('\n'),
+        );
+      } else if (node.beginToken.toString().startsWith('///')) {
+        item.introduction = formatDocumentationForMarkdown(
+          node.beginToken.toString(),
+        );
+      }
     }
   }
 
@@ -809,7 +842,7 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
     applyCallableDocumentation(functionInfo);
     for (final PropertyInfo parameter in functionInfo.params) {
       if (parameter.type.isEmpty) {
-        parameter.type = '-';
+        parameter.type = 'dynamic';
       }
       if (parameter.introduction.isEmpty) {
         parameter.introduction = fallbackParameterIntroduction(parameter.name);
@@ -857,6 +890,10 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
     if (isTarget) {
       componentInfo ??= ComponentInfo();
       componentInfo!.name = className;
+      if (node.abstractKeyword == null &&
+          !node.members.any((member) => member is ConstructorDeclaration)) {
+        componentInfo!.hasDefaultConstructor = true;
+      }
       if (node.documentationComment != null) {
         componentInfo!.introduction = formatDocumentationForMarkdown(
           node.documentationComment!.tokens.join('\n'),
@@ -911,6 +948,45 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
   }
 
   @override
+  void visitExtensionDeclaration(ExtensionDeclaration node) {
+    final String? name = node.name?.lexeme;
+    if (name == null || !nameList!.contains(name)) return;
+    _resetClassState();
+    _currentClassName = name;
+    _currentTargetClassName = name;
+    componentInfo =
+        ComponentInfo()
+          ..name = name
+          ..kind = 'extension'
+          ..introduction = formatDocumentationForMarkdown(
+            node.documentationComment?.tokens.join('\n') ?? '',
+          );
+    node.visitChildren(this);
+    _splitFieldsBeyondConstructor();
+    _finalizeCallableMethodParams();
+    _emitParsedInfo(
+      ParsedComponentInfoInfo()
+        ..componentInfo = componentInfo
+        ..propertyList = propertyList
+        ..extraPropertyList = extraPropertyList
+        ..staticMemberList = staticMemberList
+        ..fieldMap = fieldMap,
+    );
+    _resetClassState();
+    _currentClassName = null;
+  }
+
+  String inferExpressionType(Expression? expression) {
+    if (expression is IntegerLiteral) return 'int';
+    if (expression is DoubleLiteral) return 'double';
+    if (expression is BooleanLiteral) return 'bool';
+    if (expression is StringLiteral) return 'String';
+    if (expression is InstanceCreationExpression)
+      return expression.constructorName.type.toSource();
+    return 'dynamic';
+  }
+
+  @override
   void visitMethodDeclaration(MethodDeclaration node) {
     if (!_isInTargetClass) {
       super.visitMethodDeclaration(node);
@@ -919,10 +995,48 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
     super.visitMethodDeclaration(node);
     final String methodName = node.name.toString();
     // 私有方法不收录
-    if (methodName.startsWith('_')) {
+    if (methodName.startsWith('_') ||
+        node.metadata.any(
+          (annotation) =>
+              annotation.name.name == 'internal' ||
+              annotation.name.name == 'visibleForTesting',
+        ) ||
+        const <String>{
+          'build',
+          'createState',
+          'debugFillProperties',
+          'hashCode',
+          '==',
+          'toString',
+        }.contains(methodName) ||
+        (node.metadata.any(
+              (annotation) => annotation.name.name == 'override',
+            ) &&
+            node.documentationComment == null)) {
       return;
     }
 
+    if (node.isGetter || node.isSetter) {
+      final PropertyInfo property = fieldMap.putIfAbsent(
+        methodName,
+        () => PropertyInfo()..name = methodName,
+      );
+      property.isStatic = node.isStatic;
+      final String type =
+          node.isGetter
+              ? node.returnType?.toSource() ?? 'dynamic'
+              : (node.parameters == null || node.parameters!.parameters.isEmpty)
+              ? 'dynamic'
+              : _buildPropertyFromParameter(
+                node.parameters!.parameters.first,
+              ).type;
+      if (node.isGetter || property.type.isEmpty) property.type = type;
+      final String docs = formatDocumentationForMarkdown(
+        node.documentationComment?.tokens.join('\n') ?? '',
+      );
+      if (docs.isNotEmpty) property.introduction = docs;
+      return;
+    }
     StaticMethodInfo methodInfo = StaticMethodInfo();
     methodInfo.name = methodName;
     methodInfo.introduction =
@@ -937,8 +1051,8 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
     componentInfo ??= ComponentInfo();
     if (node.isStatic) {
       componentInfo!.staticMethodList.add(methodInfo);
-    } else if (_currentClassIsAbstract) {
-      // abstract class 的实例方法（含 abstract 方法和带默认实现的可覆写方法）
+    } else {
+      // Concrete controllers and handles expose instance methods too.
       componentInfo!.instanceMethodList.add(methodInfo);
     }
   }

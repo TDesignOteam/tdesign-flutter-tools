@@ -28,6 +28,11 @@ class CreateCommand extends Command {
       help: '[可选]生成的组件示例文件夹名称,默认文件夹名称是第一项name的下划线表示',
     );
     argParser.addOption('output', help: '文件输出路径');
+    argParser.addFlag(
+      'strict-names',
+      defaultsTo: false,
+      help: '只输出 --name 显式声明的公开类型和函数',
+    );
     argParser.addFlag('only-api', defaultsTo: false, help: '是否只生成api文件');
     argParser.addFlag(
       'get-comments',
@@ -50,6 +55,7 @@ class CreateCommand extends Command {
     bool onlyApi = argResults!['only-api'] ?? false;
     commandInfo.isOnlyApi = onlyApi;
     commandInfo.widgetNames = argResults!['name'].toString();
+    commandInfo.strictNames = argResults!['strict-names'] ?? false;
     commandInfo.isGetComments = argResults!['get-comments'] ?? false;
     return commandInfo;
   }

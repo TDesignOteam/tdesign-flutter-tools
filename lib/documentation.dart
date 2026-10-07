@@ -278,11 +278,14 @@ String stripIntroductionForApiSummary(String text) {
     return text;
   }
   final RegExp exampleWithFence = RegExp(
-    r'(^|\n)\s*\*\*示例\*\*\s*\n(?:\s*\n)*\s*```[\s\S]*?```',
+    r'(^|\n)\s*\*\*示例\*\*[：:]?\s*\n(?:\s*\n)*\s*```[\s\S]*?```',
     multiLine: true,
   );
   var cleaned = text.replaceAll(exampleWithFence, '\n');
-  cleaned = cleaned.replaceAll(RegExp(r'(^|\n)\s*\*\*示例\*\*\s*(?=\n|$)'), '\n');
+  cleaned = cleaned.replaceAll(
+    RegExp(r'(^|\n)\s*\*\*示例\*\*[：:]?\s*(?=\n|$)'),
+    '\n',
+  );
   cleaned = cleaned.replaceAll(
     RegExp(r'(^|\n)```[\s\S]*?```', multiLine: true),
     '\n',

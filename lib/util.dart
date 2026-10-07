@@ -26,7 +26,8 @@ String formalParameterName(FormalParameter param) {
 }
 
 /// Dart 库级私有命名构造（如 `ClassName._`），不应对外 API 文档展示。
-bool isLibraryPrivateNamedConstructor(String? name) => name == '_';
+bool isLibraryPrivateNamedConstructor(String? name) =>
+    name?.startsWith('_') ?? false;
 
 /// 从构造/方法参数 AST 提取类型字符串
 String extractFormalParameterType(
@@ -102,6 +103,10 @@ String sanitizeTableCell(String? text) {
       .replaceAll(RegExp(r'\s+'), ' ')
       .trim();
 }
+
+/// Preserve Dart generics when Markdown interprets angle brackets as HTML.
+String sanitizeApiType(String type) =>
+    sanitizeTableCell(type).replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 
 /// 格式化方法参数列表，便于写入 Markdown 表格
 String formatMethodParams(List<PropertyInfo> params) {
