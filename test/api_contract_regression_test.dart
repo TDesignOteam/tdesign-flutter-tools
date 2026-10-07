@@ -147,6 +147,8 @@ class Fixture {
         await temp.delete(recursive: true);
       }
     },
+    // Four separate CLI launches compile on a cold CI runner.
+    timeout: const Timeout(Duration(minutes: 2)),
   );
 
   for (final heading in ['', '#### 参数\n', '##### 参数\n']) {
