@@ -1,3 +1,5 @@
+import 'api_signature.dart';
+
 //组件信息
 // import 'package:component_info/component_info.dart';
 
@@ -71,6 +73,8 @@ class ComponentInfo {
   String defaultConstructorIntroduction = '';
   String declaration = '';
   String defaultConstructorSignature = '';
+  ApiCallableKind defaultConstructorKind = ApiCallableKind.constructor;
+  bool defaultConstructorIsExternal = false;
 
   // Public instance method documentation.
   List<StaticMethodInfo> instanceMethodList = [];
@@ -270,6 +274,8 @@ class CommandInfo {
 
 class StaticMethodInfo {
   String signature = '';
+  ApiCallableKind callableKind = ApiCallableKind.method;
+  bool isExternal = false;
   bool isFactory = false;
   // 方法名称
   String? name;

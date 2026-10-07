@@ -17,7 +17,7 @@ class DemoHandle {
   /// Mutable text.
   set label(String value) {}
 
-  /// Rebuild hook, not a user command.
+  /// A business method named build is still public.
   void build() {}
 }
 

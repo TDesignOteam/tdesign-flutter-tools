@@ -1,0 +1,60 @@
+import 'package:analyzer/dart/analysis/utilities.dart';
+import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/ast/token.dart';
+import 'package:dart_style/dart_style.dart';
+
+/// Callable syntax, independent of the rendered section title.
+enum ApiCallableKind { method, constructor, factoryConstructor, function }
+
+/// Format a declaration without changing tokens inside string literals.
+String formatApiSignature(
+  String signature, {
+  String ownerDeclaration = '',
+  ApiCallableKind kind = ApiCallableKind.method,
+  bool isExternal = false,
+}) {
+  final suffix =
+      isExternal || kind == ApiCallableKind.constructor
+          ? ';'
+          : kind == ApiCallableKind.factoryConstructor
+          ? ' = _DocumentationConstructor;'
+          : ' => throw UnimplementedError();';
+  final wrapped =
+      ownerDeclaration.isEmpty
+          ? '$signature$suffix'
+          : '$ownerDeclaration { $signature$suffix }';
+  final formatted = DartFormatter(
+    languageVersion: DartFormatter.latestLanguageVersion,
+  ).format(wrapped);
+  final owner = parseString(content: formatted).unit.declarations.single;
+  final AnnotatedNode callable =
+      owner is ClassDeclaration
+          ? owner.members.single
+          : owner is ExtensionDeclaration
+          ? owner.members.single
+          : owner;
+  final end =
+      callable is ConstructorDeclaration
+          ? callable.parameters.end
+          : callable is MethodDeclaration
+          ? callable.parameters!.end
+          : (callable as FunctionDeclaration)
+              .functionExpression
+              .parameters!
+              .end;
+
+  // Only whitespace BETWEEN tokens belongs to the wrapper. Literal contents,
+  // including multiline/interpolated strings, are copied without modification.
+  final buffer = StringBuffer();
+  Token? token = callable.firstTokenAfterCommentAndMetadata;
+  var previousEnd = token.offset;
+  while (token != null && token.offset < end && !token.isEof) {
+    buffer.write(
+      formatted.substring(previousEnd, token.offset).replaceAll('\n  ', '\n'),
+    );
+    buffer.write(token.lexeme);
+    previousEnd = token.end;
+    token = token.next;
+  }
+  return buffer.toString();
+}

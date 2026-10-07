@@ -39,8 +39,12 @@
 8. **不对个别组件做特殊兼容**
    工具只保留单一 AST / dartdoc 解析路线；注释位置或格式不对，应在 `tdesign-component` 修正。
 
-9. **CI 抽测清单见 `.github/config/tdesign_api.yaml`**
-   本地 `validate` 与 CI 使用同一配置；`ERROR` 需为 0，`WARN` 多为 enum 成员缺注释等源码问题。
+   解析（`component_rule.dart`）、框架成员筛选（`public_member_policy.dart`）、签名格式化（`api_signature.dart`）与 Markdown 渲染（`api_markdown.dart`）分别维护。渲染不修改解析模型；构造/工厂/external 按 AST 标记处理。仅过滤能由所属基类识别的框架钩子，业务 `build` 和普通接口 `override` 不会因名字或缺注释被隐藏。函数类型参数保留完整类型；无法从源码推断的父类/字段类型显示 `-`，不伪造 `dynamic`。代码单元格保留字符串空白并转义 HTML 实体。
+
+   默认构造参数使用五级子标题，`validate` 同时兼容既有的四级参数标题。CI 在 Flutter 3.32.0 与 latest 下运行完整工具单测，包含真实 CLI generate → validate 正例及删参数反例。
+
+9. **生成与验收共用消费仓库 `tool/components.json`**
+   `validate --component-root ...` 默认验收完整 manifest，支持 file/folder、声明及顶层函数。仍可用 `--config` 指定原有 YAML/JSON 抽测清单；`ERROR` 需为 0，`WARN` 多为 enum 成员缺注释等源码问题。
 
 ## 快速开始
 
@@ -74,12 +78,12 @@ cd $TOOLS
 
 dart run bin/main.dart validate \
   --component-root $COMPONENT \
-  --config .github/config/tdesign_api.yaml
+  --config $COMPONENT/tool/components.json
 
 # 仅测部分组件
 dart run bin/main.dart validate \
   --component-root $COMPONENT \
-  --config .github/config/tdesign_api.yaml \
+  --config $COMPONENT/tool/components.json \
   --components button,popup
 ```
 
@@ -187,7 +191,7 @@ dart run bin/main.dart generate \
 ```bash
 dart run bin/main.dart validate \
   --component-root <tdesign-component> \
-  --config .github/config/tdesign_api.yaml \
+  --config $COMPONENT/tool/components.json \
   [--components button,popup]
 ```
 

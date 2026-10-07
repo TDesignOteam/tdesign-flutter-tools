@@ -39,7 +39,10 @@ String extractFormalParameterType(
     target = param.parameter;
   }
   if (target is SimpleFormalParameter) {
-    return target.type?.toString() ?? '';
+    return target.type?.toString() ?? 'dynamic';
+  }
+  if (target is FunctionTypedFormalParameter) {
+    return '${target.returnType?.toSource() ?? 'dynamic'} Function${target.typeParameters?.toSource() ?? ''}${target.parameters.toSource()}${target.question == null ? '' : '?'}';
   }
   if (target is FieldFormalParameter) {
     return target.type?.toString() ?? '';
@@ -106,7 +109,16 @@ String sanitizeTableCell(String? text) {
 
 /// Preserve Dart generics when Markdown interprets angle brackets as HTML.
 String sanitizeApiType(String type) =>
-    sanitizeTableCell(type).replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+    type.isEmpty
+        ? '-'
+        : type
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('|', r'\|')
+            .replaceAll('\r', '&#13;')
+            .replaceAll('\n', '&#10;')
+            .replaceAll('\t', '&#9;');
 
 /// 格式化方法参数列表，便于写入 Markdown 表格
 String formatMethodParams(List<PropertyInfo> params) {

@@ -107,12 +107,11 @@ class ValidateCommand extends Command {
     );
     argParser.addOption(
       'config',
-      help: '审计清单 YAML/JSON 路径',
-      defaultsTo: '.github/config/tdesign_api.yaml',
+      help: '审计清单 YAML/JSON 路径；默认读取 component-root/tool/components.json',
     );
     argParser.addMultiOption(
       'components',
-      help: '仅检测指定组件，如 button,picker（默认 5 组件全量）',
+      help: '仅检测指定组件，如 button,picker（默认清单全量）',
     );
     argParser.addFlag('verbose', abbr: 'v', help: '打印 analyzer 解析过程');
   }
@@ -130,7 +129,9 @@ class ValidateCommand extends Command {
       return;
     }
 
-    final String configRaw = argResults!['config'] as String;
+    final String configRaw =
+        argResults!['config'] as String? ??
+        defaultAuditConfigPath(componentRoot: componentRoot);
     final String configPath =
         p.isAbsolute(configRaw)
             ? p.normalize(configRaw)

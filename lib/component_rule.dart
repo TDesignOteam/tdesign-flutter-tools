@@ -5,7 +5,9 @@ import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/ast/token.dart';
 import 'documentation.dart';
+import 'api_signature.dart';
 import 'model.dart';
+import 'public_member_policy.dart';
 import 'util.dart';
 
 typedef OnParsedComponentInfoInfo = void Function(ParsedComponentInfoInfo info);
@@ -666,7 +668,7 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
           }
         }
         if (param.type.isEmpty) {
-          param.type = 'dynamic';
+          param.type = '-';
         }
       }
     }
@@ -697,6 +699,12 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
       if (_isInTargetClass) {
         componentInfo ??= ComponentInfo();
         componentInfo!.hasDefaultConstructor = true;
+        componentInfo!.defaultConstructorKind =
+            node.factoryKeyword == null
+                ? ApiCallableKind.constructor
+                : ApiCallableKind.factoryConstructor;
+        componentInfo!.defaultConstructorIsExternal =
+            node.externalKeyword != null;
         componentInfo!.defaultConstructorSignature = declarationSignature(
           node,
           node.parameters.end,
@@ -743,6 +751,11 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
       final StaticMethodInfo staticMethodInfo = StaticMethodInfo();
       staticMethodInfo.name = constructorName;
       staticMethodInfo.isFactory = node.factoryKeyword != null;
+      staticMethodInfo.callableKind =
+          staticMethodInfo.isFactory
+              ? ApiCallableKind.factoryConstructor
+              : ApiCallableKind.constructor;
+      staticMethodInfo.isExternal = node.externalKeyword != null;
       staticMethodInfo.signature = declarationSignature(
         node,
         node.parameters.end,
@@ -863,6 +876,8 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
     final StaticMethodInfo functionInfo =
         StaticMethodInfo()
           ..name = functionName
+          ..callableKind = ApiCallableKind.function
+          ..isExternal = node.externalKeyword != null
           ..signature = declarationSignature(node, parameters.end)
           ..returnType = node.returnType?.toSource() ?? 'dynamic'
           ..introduction = node.documentationComment?.tokens.join('\n') ?? '';
@@ -872,7 +887,7 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
     applyCallableDocumentation(functionInfo);
     for (final PropertyInfo parameter in functionInfo.params) {
       if (parameter.type.isEmpty) {
-        parameter.type = 'dynamic';
+        parameter.type = '-';
       }
       if (parameter.introduction.isEmpty) {
         parameter.introduction = fallbackParameterIntroduction(
@@ -1016,13 +1031,14 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
   }
 
   String inferExpressionType(Expression? expression) {
+    if (expression is NullLiteral) return 'Null';
     if (expression is IntegerLiteral) return 'int';
     if (expression is DoubleLiteral) return 'double';
     if (expression is BooleanLiteral) return 'bool';
     if (expression is StringLiteral) return 'String';
     if (expression is InstanceCreationExpression)
       return expression.constructorName.type.toSource();
-    return 'dynamic';
+    return '-';
   }
 
   @override
@@ -1040,19 +1056,7 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
               annotation.name.name == 'internal' ||
               annotation.name.name == 'visibleForTesting',
         ) ||
-        const <String>{
-          'build',
-          'createState',
-          'debugFillProperties',
-          'hashCode',
-          '==',
-          'toString',
-        }.contains(methodName) ||
-        (node.metadata.any(
-              (annotation) => annotation.name.name == 'override',
-            ) &&
-            node.documentationComment == null &&
-            !const {'copyWith', 'lerp', '[]'}.contains(methodName))) {
+        isFrameworkHook(node)) {
       return;
     }
 
@@ -1079,6 +1083,7 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
     }
     StaticMethodInfo methodInfo = StaticMethodInfo();
     methodInfo.name = methodName;
+    methodInfo.isExternal = node.externalKeyword != null;
     methodInfo.signature = declarationSignature(
       node,
       node.parameters?.end ?? node.body.offset,

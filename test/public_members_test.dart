@@ -47,7 +47,7 @@ void main() {
       );
       expect(
         handle.componentInfo!.instanceMethodList.map((method) => method.name),
-        <String>['close'],
+        <String>['close', 'build'],
       );
       final options = infos.firstWhere(
         (info) => info.componentInfo!.name == 'DemoOptions',
