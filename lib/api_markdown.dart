@@ -17,6 +17,11 @@ String renderApiMarkdown(
 
 ''';
   StringBuffer sb = StringBuffer(fileContent);
+  String tableDocumentation(String text) {
+    final prose = formatDocumentationForApi(text);
+    return sanitizeTableCell(prose.isEmpty ? '-' : prose);
+  }
+
   final List<ParsedComponentInfoInfo> documentedInfos =
       strictNames
           ? parsedComponentInfoList
@@ -28,6 +33,13 @@ String renderApiMarkdown(
       sb.write('\n\n');
     }
     sb.write('### ${apiInfo.componentInfo!.name}');
+    final typeContract = apiTypeContract(apiInfo.componentInfo!.declaration);
+    if (typeContract.parameters.isNotEmpty) {
+      sb.write('\n\n类型参数：`${sanitizeApiType(typeContract.parameters)}`\n');
+    }
+    if (typeContract.onType.isNotEmpty) {
+      sb.write('\n\n适用类型：`${sanitizeApiType(typeContract.onType)}`\n');
+    }
     final introduction = apiInfo.componentInfo!.introduction ?? '';
     final String introForSummary = formatIntroductionForApiSummary(
       introduction,
@@ -61,7 +73,7 @@ String renderApiMarkdown(
             final String doc =
                 member.introduction.isEmpty ? '-' : member.introduction;
             sb.write(
-              '| ${sanitizeTableCell(member.name)} | ${sanitizeTableCell(doc)} |\n',
+              '| ${sanitizeTableCell(member.name)} | ${tableDocumentation(doc)} |\n',
             );
           }
         }
@@ -106,7 +118,7 @@ String renderApiMarkdown(
       }
       sb.write('\n#### 顶层函数');
       if (function.introduction?.isNotEmpty ?? false) {
-        sb.write('\n\n${function.introduction}');
+        sb.write('\n\n${formatDocumentationForApi(function.introduction!)}');
       }
       final String returnType = function.returnType ?? 'dynamic';
       sb.write('\n\n返回类型：`$returnType`');
@@ -120,7 +132,7 @@ String renderApiMarkdown(
         );
         for (final PropertyInfo parameter in function.params) {
           sb.write(
-            '| ${sanitizeTableCell(parameter.name)} | ${sanitizeApiType(parameter.type.isEmpty ? '-' : parameter.type)} | ${sanitizeApiType(parameter.defaultValue)} | ${sanitizeTableCell(parameter.introduction.isEmpty ? '-' : parameter.introduction)} | ${parameter.isRequired ? '是' : '否'} |\n',
+            '| ${sanitizeTableCell(parameter.name)} | ${sanitizeApiType(parameter.type.isEmpty ? '-' : parameter.type)} | ${sanitizeApiType(parameter.defaultValue)} | ${tableDocumentation(parameter.introduction)} | ${parameter.isRequired ? '是' : '否'} |\n',
           );
         }
       }
@@ -131,10 +143,6 @@ String renderApiMarkdown(
       sb.write('\n#### 简介\n');
       sb.write(introForSummary);
     }
-    if (apiInfo.componentInfo!.declaration.isNotEmpty)
-      sb.write(
-        '\n\n#### 声明\n\n```dart\n${apiInfo.componentInfo!.declaration}\n```\n',
-      );
     void writeSignature(
       String signature, {
       ApiCallableKind kind = ApiCallableKind.method,
@@ -168,7 +176,7 @@ String renderApiMarkdown(
 | --- | --- | --- | --- |${showRequired ? ' --- |' : ''}\n''');
       for (final PropertyInfo item in items) {
         sb.write(
-          '''| ${sanitizeTableCell(item.name)} | ${sanitizeApiType(item.type.isEmpty ? '-' : item.type)} | ${sanitizeApiType(item.defaultValue)} | ${sanitizeTableCell(item.introduction.isEmpty ? '-' : item.introduction)} |${showRequired ? ' ${item.isRequired ? '是' : '否'} |' : ''}\n''',
+          '''| ${sanitizeTableCell(item.name)} | ${sanitizeApiType(item.type.isEmpty ? '-' : item.type)} | ${sanitizeApiType(item.defaultValue)} | ${tableDocumentation(item.introduction)} |${showRequired ? ' ${item.isRequired ? '是' : '否'} |' : ''}\n''',
         );
       }
     }
@@ -244,7 +252,7 @@ String renderApiMarkdown(
                 ? forwardedParam.introduction
                 : param.introduction;
         sb.write(
-          '''| ${sanitizeTableCell(param.name)} | ${sanitizeApiType(type.isEmpty ? '-' : type)} | ${sanitizeApiType(param.defaultValue)} | ${sanitizeTableCell(introduction.isEmpty ? '-' : introduction)} | ${param.isRequired ? '是' : '否'} |\n''',
+          '''| ${sanitizeTableCell(param.name)} | ${sanitizeApiType(type.isEmpty ? '-' : type)} | ${sanitizeApiType(param.defaultValue)} | ${tableDocumentation(introduction)} | ${param.isRequired ? '是' : '否'} |\n''',
         );
       }
     }
@@ -274,7 +282,7 @@ String renderApiMarkdown(
           isExternal: item.isExternal,
         );
         if (item.introduction != null && item.introduction!.isNotEmpty) {
-          sb.write('\n\n${item.introduction}');
+          sb.write('\n\n${formatDocumentationForApi(item.introduction!)}');
         }
         final String returnType =
             item.returnType == 'null' ? '' : (item.returnType ?? '');
@@ -320,7 +328,7 @@ String renderApiMarkdown(
         isExternal: apiInfo.componentInfo!.defaultConstructorIsExternal,
       );
       final String docs = apiInfo.componentInfo!.defaultConstructorIntroduction;
-      if (docs.isNotEmpty) sb.write('\n$docs\n');
+      if (docs.isNotEmpty) sb.write('\n${formatDocumentationForApi(docs)}\n');
     }
     if (apiInfo.propertyList.isNotEmpty) {
       sb.write('\n#### 默认构造方法\n');
@@ -330,7 +338,7 @@ String renderApiMarkdown(
         isExternal: apiInfo.componentInfo!.defaultConstructorIsExternal,
       );
       final docs = apiInfo.componentInfo!.defaultConstructorIntroduction;
-      if (docs.isNotEmpty) sb.write('\n$docs\n');
+      if (docs.isNotEmpty) sb.write('\n${formatDocumentationForApi(docs)}\n');
       writePropertyTable(
         apiInfo.propertyList,
         header: '参数',

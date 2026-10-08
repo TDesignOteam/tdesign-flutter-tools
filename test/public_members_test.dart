@@ -121,7 +121,7 @@ void main() {
         expect(html, contains('<td>List&lt;String&gt;</td>'));
         expect(html, isNot(contains('<String>')));
         expect(markdown, contains('typedef GenericBuilder<T>'));
-        expect(markdown, contains('class DemoGeneric<T extends Object>'));
+        expect(markdown, contains('类型参数：`T extends Object`'));
         expect(
           markdown,
           contains('T? read<E extends Object>(E value, [T? fallback])'),

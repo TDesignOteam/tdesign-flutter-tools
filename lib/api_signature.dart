@@ -6,6 +6,27 @@ import 'package:dart_style/dart_style.dart';
 /// Callable syntax, independent of the rendered section title.
 enum ApiCallableKind { method, constructor, factoryConstructor, function }
 
+/// Compact type contract, without a standalone class/extension declaration.
+({String parameters, String onType}) apiTypeContract(String declaration) {
+  if (declaration.isEmpty) return (parameters: '', onType: '');
+  final owner =
+      parseString(content: '$declaration {}').unit.declarations.single;
+  final parameters =
+      owner is ClassDeclaration
+          ? owner.typeParameters
+          : owner is ExtensionDeclaration
+          ? owner.typeParameters
+          : null;
+  return (
+    parameters:
+        parameters?.typeParameters.map((p) => p.toSource()).join(', ') ?? '',
+    onType:
+        owner is ExtensionDeclaration
+            ? owner.onClause?.extendedType.toSource() ?? ''
+            : '',
+  );
+}
+
 /// Format a declaration without changing tokens inside string literals.
 String formatApiSignature(
   String signature, {

@@ -272,13 +272,47 @@ String formatDocumentationForMarkdown(String? raw) {
   return parseDocumentation(raw).narrative;
 }
 
-/// 保留简介中的正文与示例代码，只去掉首尾空白。
+/// API 正文保留行为契约，完整代码示例由专门的示例页展示。
 ///
-/// dartdoc 的代码示例也是用户文档；删除围栏会丢失使用方式，并留下孤立的
-/// “示例”或“典型用法”标题。Markdown 渲染器负责呈现完整简介。
-String formatIntroductionForApiSummary(String text) => text.trim();
+/// 仅在渲染时过滤，不修改解析模型或源码 dartdoc。支持反引号及波浪线
+/// 围栏，包括长围栏中出现短围栏的代码；行内代码和后续说明保持不变。
+String formatDocumentationForApi(String text) {
+  final lines = <String>[];
+  String? fenceCharacter;
+  var fenceLength = 0;
+  final fenceStart = RegExp(r'^ {0,3}(`{3,}|~{3,})(.*)$');
+  final exampleLabel = RegExp(
+    r'^(?:#{1,6}\s+)?(?:\*\*|__)?(?:示例|代码示例|使用示例|用法示例|典型用法|基本用法|例如|examples?|usage examples?)[:：]?(?:\*\*|__)?[:：]?$',
+    caseSensitive: false,
+  );
+  for (final line in text.split('\n')) {
+    if (fenceCharacter != null) {
+      final closing = RegExp(
+        '^ {0,3}${RegExp.escape(fenceCharacter)}{$fenceLength,}[ \\t]*\$',
+      );
+      if (closing.hasMatch(line)) fenceCharacter = null;
+      continue;
+    }
+    final fence = fenceStart.firstMatch(line);
+    if (fence != null &&
+        !(fence.group(1)!.startsWith('`') && fence.group(2)!.contains('`'))) {
+      fenceCharacter = fence.group(1)![0];
+      fenceLength = fence.group(1)!.length;
+      continue;
+    }
+    if (!exampleLabel.hasMatch(line.trim())) lines.add(line);
+  }
+  return lines
+      .join('\n')
+      .replaceAll(RegExp(r'\n(?:[ \t]*\n){2,}'), '\n\n')
+      .trim();
+}
 
-/// 兼容旧工具调用方；简介现在保留示例代码。
+/// 简介与构造、方法正文使用相同的 API 展示规则。
+String formatIntroductionForApiSummary(String text) =>
+    formatDocumentationForApi(text);
+
+/// 兼容旧工具调用方。
 @Deprecated('Use formatIntroductionForApiSummary instead.')
 String stripIntroductionForApiSummary(String text) =>
     formatIntroductionForApiSummary(text);

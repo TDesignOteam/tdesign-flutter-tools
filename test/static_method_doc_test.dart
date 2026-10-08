@@ -308,26 +308,30 @@ void main() {
         r'### TypeAlpha[\s\S]*?\n\n### TypeBeta',
       ).firstMatch(content);
       expect(sectionGap, isNotNull);
-      expect(sectionGap!.group(0), contains('class TypeAlpha'));
-      expect(content, contains('class TypeBeta'));
+      expect(sectionGap!.group(0), contains('const TypeAlpha()'));
+      expect(content, contains('const TypeBeta()'));
+      expect(content, isNot(contains('#### 声明')));
     });
 
-    test('with --get-comments preserves intro examples', () async {
-      final String content = await _generateFixtureApi(
-        names: <String>['TypeAlpha'],
-        fixtureFile: 'multi_type_intro_fixture.dart',
-        folderName: 'multi_type_intro',
-        getComments: true,
-      );
+    test(
+      'with --get-comments retains prose and omits intro examples',
+      () async {
+        final String content = await _generateFixtureApi(
+          names: <String>['TypeAlpha'],
+          fixtureFile: 'multi_type_intro_fixture.dart',
+          folderName: 'multi_type_intro',
+          getComments: true,
+        );
 
-      expect(content, contains('#### 简介'));
-      expect(content, contains('第一个组件说明'));
-      expect(content, contains('TypeAlpha.demo()'));
-      expect(
-        content.split('#### 简介').last.split('\n#### ').first,
-        contains('```dart'),
-      );
-    });
+        expect(content, contains('#### 简介'));
+        expect(content, contains('第一个组件说明'));
+        expect(content, isNot(contains('TypeAlpha.demo()')));
+        expect(
+          content.split('#### 简介').last.split('\n#### ').first,
+          isNot(contains('```dart')),
+        );
+      },
+    );
 
     test('without --get-comments omits intro for all kinds', () async {
       final String content = await _generateFixtureApi(

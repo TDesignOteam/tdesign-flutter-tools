@@ -134,7 +134,7 @@ final values = [first, second];
     expect(result.narrative, contains('final values = [first, second];'));
   });
 
-  test('formatIntroductionForApiSummary preserves 示例 and fenced blocks', () {
+  test('API summary omits example labels and fences but retains prose', () {
     const raw = '''
 第一段说明。
 
@@ -145,13 +145,11 @@ final a = 1;
 
 第二段说明。
 ''';
-    expect(formatIntroductionForApiSummary(raw), raw.trim());
+    expect(formatIntroductionForApiSummary(raw), '第一段说明。\n\n第二段说明。');
   });
 
-  test(
-    'formatIntroductionForApiSummary preserves standalone fenced blocks',
-    () {
-      const raw = '''
+  test('API summary omits standalone fenced examples', () {
+    const raw = '''
 第一段说明。
 
 ```dart
@@ -160,12 +158,39 @@ final a = 1;
 
 第二段说明。
 ''';
-      expect(formatIntroductionForApiSummary(raw), raw.trim());
-      expect(formatIntroductionForApiSummary(raw), contains('```dart'));
+    expect(formatIntroductionForApiSummary(raw), '第一段说明。\n\n第二段说明。');
+  });
+  test(
+    'summary omits the plain example label without losing later constraints',
+    () {
+      const raw = '说明。\n\n示例：\n```dart\nTDivider()\n```\n\n后续契约。';
+      expect(formatIntroductionForApiSummary(raw), '说明。\n\n后续契约。');
     },
   );
-  test('summary preserves the plain example label with its fence', () {
-    const raw = '说明。\n\n示例：\n```dart\nTDivider()\n```\n\n后续契约。';
-    expect(formatIntroductionForApiSummary(raw), raw);
-  });
+
+  test(
+    'API prose preserves inline defaults and handles long and tilde fences',
+    () {
+      const raw = '''
+`null` 保留原值；零时长会关闭。
+
+### 使用示例
+````dart
+final text = '```';
+```
+````
+
+**Examples:**
+~~~dart
+open();
+~~~
+
+不可重复绑定，否则抛出 `StateError`。
+''';
+      expect(
+        formatDocumentationForApi(raw),
+        '`null` 保留原值；零时长会关闭。\n\n不可重复绑定，否则抛出 `StateError`。',
+      );
+    },
+  );
 }

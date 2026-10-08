@@ -24,7 +24,7 @@
 
 5. **`--get-comments` 控制是否输出 `#### 简介`**
    - 不加：只生成参数表、工厂、枚举值等，**不写**类简介。
-   - 加上：输出简介，保留源码 dartdoc 中的段落、列表与代码示例。
+   - 加上：输出简介，保留行为说明、段落、列表与行内参数值；完整代码示例及独立示例标题由专门的示例页展示，不进入 API 页。此规则同样适用于构造、方法及其他 API 正文，源码 dartdoc 保持完整。
    旧版曾在多类型之间误插入空 `` ``` `` 两行，当前已移除；请用 `dart run bin/main.dart` 生成。
 
 6. **`library` + `part` 需在 `--name` 中显式列出声明**
@@ -34,7 +34,7 @@
    工具会为任意公开顶层函数生成独立 API 区块，包含返回类型、参数类型、默认值和 dartdoc；私有函数、getter、setter 以及未登记函数不会被收录。
    维护组件清单时加 `--strict-names`，只输出 `--name` 中登记的声明，避免同文件辅助枚举或 typedef 混入其他组件文档。文件夹扫描会递归读取 `.dart` 源文件。
 
-   公开普通实例方法、字段访问器、命名/工厂/无参构造与命名 extension 均会展示；Flutter 构建钩子、未自行补充文档的标准继承 override、`@internal` 和 `@visibleForTesting` 成员不收录。默认值保留声明值，Theme / Token 回退由源码注释说明；构造及方法参数另列是否必填。泛型在 Markdown 表格中转义，保留网页与 Demo 中的完整类型。类/extension 与可调用声明另外输出源码签名，包含泛型约束、位置/命名参数、默认值及 const/factory 标记；每个构造或方法独立列出完整参数。自定义 copyWith/lerp/Token 查询运算符会展示，即使源码尚未补注释也不会静默遗漏。参数说明仅从源码注释、构造/复制字段或 AST 可证明的透传获取；Widget key 的兜底说明仅适用于 Key/Key?，不会套用到 Token 的 String/Object 键。
+   公开普通实例方法、字段访问器、命名/工厂/无参构造与命名 extension 均会展示；Flutter 构建钩子、未自行补充文档的标准继承 override、`@internal` 和 `@visibleForTesting` 成员不收录。默认值保留声明值，Theme / Token 回退由源码注释说明；构造及方法参数另列是否必填。泛型在 Markdown 表格中转义，保留网页与 Demo 中的完整类型。类/extension 不再单列声明章节，类型参数和 extension 适用类型用简短说明展示；构造、方法及函数保留源码调用签名，包含泛型约束、位置/命名参数、默认值及 const/factory 标记；每个构造或方法独立列出完整参数。自定义 copyWith/lerp/Token 查询运算符会展示，即使源码尚未补注释也不会静默遗漏。参数说明仅从源码注释、构造/复制字段或 AST 可证明的透传获取；Widget key 的兜底说明仅适用于 Key/Key?，不会套用到 Token 的 String/Object 键。
 
 8. **不对个别组件做特殊兼容**
    工具只保留单一 AST / dartdoc 解析路线；注释位置或格式不对，应在 `tdesign-component` 修正。
@@ -152,7 +152,7 @@ enum TSize { small, medium, large }
 | 静态方法 → 命名工厂 → 默认构造 → 公开属性/成员 | 注释位置、语义正确 |
 | 隐藏 `ClassName._`；dartdoc → Markdown | 无注释时显示 `-` |
 | 同文件收录 public enum/typedef；跨文件重复告警 | `--name` 与 CI 清单一致 |
-| 简介保留源码示例与代码块 | 不在类简介用表写方法参数 |
+| API 保留行为契约，完整示例由示例页展示 | 源码 dartdoc 可以保留示例；不在类简介用表写方法参数 |
 
 ## 命令
 
