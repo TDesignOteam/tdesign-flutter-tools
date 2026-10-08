@@ -41,7 +41,7 @@
 
    解析（`component_rule.dart`）、框架成员筛选（`public_member_policy.dart`）、调用契约提取（`api_signature.dart`）与 Markdown 渲染（`api_markdown.dart`）分别维护。渲染不修改解析模型；构造/工厂/external 按 AST 标记处理。仅过滤能由所属基类识别的框架钩子，业务 `build` 和普通接口 `override` 不会因名字或缺注释被隐藏。函数类型参数保留完整类型；无法从源码推断的父类/字段类型显示 `-`，不伪造 `dynamic`。代码单元格保留字符串空白并转义 HTML 实体。
 
-   默认构造参数使用五级子标题，`validate` 同时兼容既有的四级参数标题。CI 在 Flutter 3.32.0 与 latest 下运行完整工具单测，包含真实 CLI generate → validate 正例及删参数反例。
+   默认与命名构造统一归入「构造方法」，各构造以实际名称使用五级标题，参数表直接展示；属性与方法随后按分组展示。`validate` 同时兼容既有默认构造及参数标题。CI 在 Flutter 3.32.0 与 latest 下运行完整工具单测，包含真实 CLI generate → validate 正例及删参数反例。
 
 9. **生成与验收共用消费仓库 `tool/components.json`**
    `validate --component-root ...` 默认验收完整 manifest，支持 file/folder、声明及顶层函数。仍可用 `--config` 指定原有 YAML/JSON 抽测清单；`ERROR` 需为 0，`WARN` 多为 enum 成员缺注释等源码问题。
@@ -124,7 +124,7 @@ dartdoc 引用 `[Type]`、`[param]` 会转为 Markdown 行内代码；已有 Mar
 
 ### 命名工厂「通用参数」
 
-多个命名工厂 1:1 透传同一组参数到默认构造时，文档会合并「通用参数」表，各工厂只保留方向独有参数。
+多个命名工厂 1:1 透传参数到默认构造时，工具按 AST 解析目标参数说明；每个构造仍独立展示完整参数表，便于查阅和校验。
 
 ### enum
 
@@ -149,7 +149,7 @@ enum TSize { small, medium, large }
 | 工具负责 | 源码负责 |
 | --- | --- |
 | 提取 class、enum、typedef、顶层函数的类型和默认值；过滤 `this.xxx` 误识别 | 参数 / 字段 `///` 文案 |
-| 静态方法 → 命名工厂 → 默认构造 → 公开属性/成员 | 注释位置、语义正确 |
+| 用途说明 → 构造方法 → 属性/静态成员 → 静态/实例方法 | 注释位置、语义正确 |
 | 隐藏 `ClassName._`；dartdoc → Markdown | 无注释时显示 `-` |
 | 同文件收录 public enum/typedef；跨文件重复告警 | `--name` 与 CI 清单一致 |
 | API 保留行为契约，完整示例由示例页展示 | 源码 dartdoc 可以保留示例；不在类简介用表写方法参数 |

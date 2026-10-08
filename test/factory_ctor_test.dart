@@ -131,7 +131,7 @@ class DemoEntry {
   );
 
   test(
-    'generateApiInfoFile orders factory constructors before default constructor',
+    'generateApiInfoFile groups default and factory constructors by name',
     () async {
       final Directory tempDir = await Directory.systemTemp.createTemp(
         'tdesign_api_section_order_',
@@ -163,8 +163,8 @@ class DemoOptions {
         final String content =
             await File('${outDir.path}/demo_api.md').readAsString();
         expect(
-          content.indexOf('#### 工厂构造方法'),
-          lessThan(content.indexOf('#### 默认构造方法')),
+          content.indexOf('##### DemoOptions\n'),
+          lessThan(content.indexOf('##### DemoOptions.bottom\n')),
         );
       } finally {
         await tempDir.delete(recursive: true);

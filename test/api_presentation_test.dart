@@ -1,4 +1,5 @@
 import 'package:analyzer/dart/analysis/utilities.dart';
+import 'package:tdesign_flutter_tools/api_completeness.dart';
 import 'package:tdesign_flutter_tools/api_markdown.dart';
 import 'package:tdesign_flutter_tools/component_rule.dart';
 import 'package:tdesign_flutter_tools/documentation.dart';
@@ -107,7 +108,7 @@ void run() {}
     );
     final output = renderApiMarkdown(parsed, names: names);
     for (final contract in [
-      '##### Defaults',
+      '###### Defaults',
       '###### Factory behavior',
       '###### Method behavior',
       '**Nested behavior**',
@@ -139,6 +140,71 @@ void run() {}
     },
   );
 
+  test(
+    'constructors share a group and named boundaries preserve parameter ownership',
+    () {
+      const source = """
+class Options {
+  /// Create a default configuration.
+  Options({this.count = 1});
+  /// Number of items.
+  final int count;
+  /// Named configuration.
+  Options.named(String label) : count = 1;
+  /// Factory configuration.
+  factory Options.factory() => Options();
+  /// Whether this configuration is active.
+  bool get active => true;
+  /// Read a configuration.
+  static Options read() => Options();
+  /// Close it.
+  void close() {}
+}
+""";
+      final parsed = <ParsedComponentInfoInfo>[];
+      parseString(content: source).unit.accept(
+        ComponentAstVisitor(
+          nameList: ['Options'],
+          onParsedComponentInfoInfo: parsed.add,
+        ),
+      );
+      final output = renderApiMarkdown(parsed, names: ['Options']);
+      final headings =
+          RegExp(
+            r'^#{4,5} .+$',
+            multiLine: true,
+          ).allMatches(output).map((m) => m.group(0)!).toList();
+      expect(headings, [
+        '#### 构造方法',
+        '##### Options',
+        '##### Options.factory',
+        '##### Options.named',
+        '#### 属性',
+        '#### 静态方法',
+        '##### Options.read',
+        '#### 实例方法',
+        '##### Options.close',
+      ]);
+      expect(output, isNot(contains('##### 参数')));
+      expect(
+        markdownDefaultCtorParamNames(
+          output.substring(output.indexOf('### Options')),
+        ),
+        {'count'},
+      );
+      final defaultSection =
+          output
+              .split('##### Options\n')
+              .last
+              .split('##### Options.factory')
+              .first;
+      expect(defaultSection, contains('| count | int | 1 |'));
+      expect(defaultSection, isNot(contains('| label |')));
+      expect(parsed.single.componentInfo!.constructorMethodList.length, 2);
+      expect(renderApiMarkdown(parsed, names: ['Options']), output);
+    },
+  );
+
   test('constructors retain only positional order and grouping', () {
     const source = '''
 /// Options.
@@ -165,7 +231,7 @@ class Options {
     expect(output, isNot(contains('const Options')));
     expect(output, isNot(contains('支持 const')));
     expect(output, contains('##### Options.empty'));
-    expect(output, contains('#### 工厂构造方法'));
+    expect(output, contains('#### 构造方法'));
     expect(output, contains('位置参数：`z`'));
     expect(output, contains('位置参数：`z, a`'));
     expect(output, contains('| count | int | 1 |'));

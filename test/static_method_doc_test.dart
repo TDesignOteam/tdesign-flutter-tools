@@ -308,7 +308,7 @@ void main() {
         r'### TypeAlpha[\s\S]*?\n\n### TypeBeta',
       ).firstMatch(content);
       expect(sectionGap, isNotNull);
-      expect(sectionGap!.group(0), contains('#### 默认构造方法'));
+      expect(sectionGap!.group(0), contains('#### 构造方法'));
       expect(content, isNot(contains('const TypeAlpha()')));
       expect(content, isNot(contains('const TypeBeta()')));
       expect(content, isNot(contains('#### 声明')));

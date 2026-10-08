@@ -132,8 +132,8 @@ void main() {
         expect(markdown, isNot(contains('### UnregisteredEnum')));
         expect(markdown, contains('| canClose | bool |'));
         expect(markdown, contains('##### DemoHelpers.dismiss'));
-        expect(markdown, contains('#### 命名构造方法'));
-        expect(markdown, contains('#### 工厂构造方法'));
+        expect(markdown, contains('#### 构造方法'));
+        expect(markdown, contains('##### DemoController\n'));
         expect(markdown, isNot(contains('```dart\nDemoController()\n```')));
         expect(markdown, contains('### DemoController\n'));
         expect(markdown, contains('Whether closure is animated.'));

@@ -131,7 +131,7 @@ class Fixture {
         expect(fromManifest.stdout, contains('1 组件'));
         final markdownFile = File('${output.path}/fixture_api.md');
         final markdown = await markdownFile.readAsString();
-        expect(markdown, contains('##### 参数'));
+        expect(markdown, contains('#### 构造方法\n\n##### Fixture'));
         expect(markdown, contains('Create a requested count.'));
         await markdownFile.writeAsString(
           markdown.replaceAll(RegExp(r'^\| count \|.*\n', multiLine: true), ''),
@@ -176,6 +176,31 @@ $heading
   }
 
   test(
+    'grouped default constructor reader stops at the next named constructor',
+    () {
+      const section = """
+### Fixture
+#### 构造方法
+##### Fixture
+###### Defaults
+Use one item by default.
+| 参数 | 类型 | 默认值 | 说明 | 必填 |
+| --- | --- | --- | --- | --- |
+| count | - | 1 | Count. | 否 |
+##### Fixture.named
+| 参数 | 类型 | 默认值 | 说明 | 必填 |
+| --- | --- | --- | --- | --- |
+| label | String | - | Label. | 是 |
+#### 属性
+| 属性 | 类型 | 默认值 | 说明 |
+| other | int | - | Other. |
+""";
+      expect(markdownDefaultCtorParamNames(section), {'count'});
+      expect(markdownCtorParamsWithEmptyType(section), ['count']);
+    },
+  );
+
+  test(
     'external methods and default/named/factory constructors generate',
     () async {
       final markdown = await generate(
@@ -191,7 +216,7 @@ class External {
         ['External'],
       );
       for (final signature in [
-        '#### 默认构造方法',
+        '##### External\n',
         '##### External.named',
         '位置参数：`value`',
         '##### External.factory',

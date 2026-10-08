@@ -196,19 +196,28 @@ Map<String, String> parseMarkdownSections(String markdown) {
   return sections;
 }
 
-/// Accept current child headings and the former sibling parameter heading.
+/// Accept constructors grouped by name and legacy default-constructor sections.
 /// Headings inside declaration code fences do not delimit the section.
 String _defaultConstructorBlock(String section) {
   final lines = section.split('\n');
-  final start = lines.indexWhere((line) => line.trim() == '#### 默认构造方法');
+  final owner = RegExp(r'^### (\S+)\n').firstMatch(section)?.group(1);
+  final namedStart = lines.indexWhere((line) => line.trim() == '##### $owner');
+  final start =
+      namedStart >= 0
+          ? namedStart
+          : lines.indexWhere((line) => line.trim() == '#### 默认构造方法');
   if (start < 0) return '';
   final result = <String>[];
   var inCode = false;
   for (final line in lines.skip(start + 1)) {
     if (line.trimLeft().startsWith('```')) inCode = !inCode;
     if (!inCode) {
-      final heading = RegExp(r'^(#{1,4})\s+(.+)$').firstMatch(line);
-      if (heading != null && line.trim() != '#### 参数') break;
+      final heading = RegExp(r'^(#{1,5})\s+(.+)$').firstMatch(line);
+      if (heading != null &&
+          heading.group(1)!.length <= (namedStart >= 0 ? 5 : 4) &&
+          line.trim() != '#### 参数') {
+        break;
+      }
     }
     result.add(line);
   }

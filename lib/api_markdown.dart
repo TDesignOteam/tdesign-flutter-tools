@@ -173,19 +173,17 @@ String renderApiMarkdown(
       List<PropertyInfo> items, {
       required String header,
       String nameColumn = '参数',
-      int headingLevel = 4,
-      bool showRequired = false,
     }) {
       if (items.isEmpty) {
         return;
       }
-      sb.write('\n${'#' * headingLevel} $header');
+      sb.write('\n\n#### $header');
       sb.write('''\n
-| $nameColumn | 类型 | 默认值 | 说明 |${showRequired ? ' 必填 |' : ''}
-| --- | --- | --- | --- |${showRequired ? ' --- |' : ''}\n''');
+| $nameColumn | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |\n''');
       for (final PropertyInfo item in items) {
         sb.write(
-          '''| ${sanitizeTableCell(item.name)} | ${sanitizeApiType(item.type.isEmpty ? '-' : item.type)} | ${sanitizeApiType(item.defaultValue)} | ${tableDocumentation(item.introduction)} |${showRequired ? ' ${item.isRequired ? '是' : '否'} |' : ''}\n''',
+          '''| ${sanitizeTableCell(item.name)} | ${sanitizeApiType(item.type.isEmpty ? '-' : item.type)} | ${sanitizeApiType(item.defaultValue)} | ${tableDocumentation(item.introduction)} |\n''',
         );
       }
     }
@@ -283,7 +281,7 @@ String renderApiMarkdown(
       for (final StaticMethodInfo item in orderedMethods) {
         currentMethod = item;
         sb.write(
-          '\n\n##### ${apiInfo.componentInfo!.name}.${sanitizeTableCell(item.name)}',
+          '\n\n##### ${apiInfo.componentInfo!.name}${item.name!.isEmpty ? '' : '.${sanitizeTableCell(item.name)}'}',
         );
         writeCallableContract(
           item.signature,
@@ -308,70 +306,37 @@ String renderApiMarkdown(
       currentMethod = null;
     }
 
-    // 对外 API 优先：命令式入口 → 命名工厂 → 默认构造 → 字段/成员 → 实例方法
-    if (apiInfo.componentInfo?.staticMethodList.isNotEmpty ?? false) {
-      writeMethodDetails(
-        apiInfo.componentInfo!.staticMethodList,
-        header: '静态方法',
-        includeReturnType: true,
-      );
-    }
-    final List<StaticMethodInfo> publicNamedConstructors =
-        apiInfo.componentInfo!.constructorMethodList
-            .where(
-              (StaticMethodInfo method) =>
-                  !isLibraryPrivateNamedConstructor(method.name),
-            )
-            .toList();
-    if (publicNamedConstructors.isNotEmpty) {
-      writeMethodDetails(
-        publicNamedConstructors.where((method) => method.isFactory).toList(),
-        header: '工厂构造方法',
-      );
-    }
-    writeMethodDetails(
-      publicNamedConstructors.where((method) => !method.isFactory).toList(),
-      header: '命名构造方法',
-    );
-    if (apiInfo.componentInfo!.hasDefaultConstructor &&
-        apiInfo.propertyList.isEmpty) {
-      sb.write('\n#### 默认构造方法\n');
-      writeCallableContract(
-        apiInfo.componentInfo!.defaultConstructorSignature,
-        kind: apiInfo.componentInfo!.defaultConstructorKind,
-        isExternal: apiInfo.componentInfo!.defaultConstructorIsExternal,
-      );
-      sb.write('\n无参数。\n');
-      final String docs = apiInfo.componentInfo!.defaultConstructorIntroduction;
-      if (docs.isNotEmpty)
-        sb.write('\n${formatDocumentationForApi(docs, headingLevel: 5)}\n');
-    }
-    if (apiInfo.propertyList.isNotEmpty) {
-      sb.write('\n#### 默认构造方法\n');
-      writeCallableContract(
-        apiInfo.componentInfo!.defaultConstructorSignature,
-        kind: apiInfo.componentInfo!.defaultConstructorKind,
-        isExternal: apiInfo.componentInfo!.defaultConstructorIsExternal,
-      );
-      final docs = apiInfo.componentInfo!.defaultConstructorIntroduction;
-      if (docs.isNotEmpty)
-        sb.write('\n${formatDocumentationForApi(docs, headingLevel: 5)}\n');
-      writePropertyTable(
-        apiInfo.propertyList,
-        header: '参数',
-        headingLevel: 5,
-        showRequired: true,
-      );
-    }
+    // 类型说明 → 构造方法 → 属性/静态成员 → 静态/实例方法。
+    // 默认构造使用相同正文渲染，不复制参数或说明格式。
+    final constructors = <StaticMethodInfo>[
+      if (apiInfo.componentInfo!.hasDefaultConstructor)
+        StaticMethodInfo()
+          ..name = ''
+          ..signature = apiInfo.componentInfo!.defaultConstructorSignature
+          ..callableKind = apiInfo.componentInfo!.defaultConstructorKind
+          ..isExternal = apiInfo.componentInfo!.defaultConstructorIsExternal
+          ..params = apiInfo.propertyList
+          ..introduction =
+              apiInfo.componentInfo!.defaultConstructorIntroduction,
+      ...apiInfo.componentInfo!.constructorMethodList.where(
+        (method) => !isLibraryPrivateNamedConstructor(method.name),
+      ),
+    ];
+    writeMethodDetails(constructors, header: '构造方法');
     writePropertyTable(
       apiInfo.extraPropertyList,
-      header: '公开属性（字段与访问器）',
+      header: '属性',
       nameColumn: '属性',
     );
     writePropertyTable(
       apiInfo.staticMemberList,
       header: '静态成员',
       nameColumn: '名称',
+    );
+    writeMethodDetails(
+      apiInfo.componentInfo!.staticMethodList,
+      header: '静态方法',
+      includeReturnType: true,
     );
     writeMethodDetails(
       apiInfo.componentInfo!.instanceMethodList,
