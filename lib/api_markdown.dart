@@ -49,7 +49,7 @@ String renderApiMarkdown(
 
     if (kind == 'enum') {
       if (showIntro && introForSummary.isNotEmpty) {
-        sb.write('\n#### 简介\n');
+        sb.write('\n\n');
         sb.write(introForSummary);
       }
       final List<EnumMemberInfo> enumMembers =
@@ -100,7 +100,7 @@ String renderApiMarkdown(
 
     if (kind == 'typedef') {
       if (showIntro && introForSummary.isNotEmpty) {
-        sb.write('\n#### 简介\n');
+        sb.write('\n\n');
         sb.write(introForSummary);
       }
       if (apiInfo.componentInfo!.typedefDefinition.isNotEmpty) {
@@ -140,7 +140,9 @@ String renderApiMarkdown(
       }
       sb.write('\n#### 顶层函数');
       if (function.introduction?.isNotEmpty ?? false) {
-        sb.write('\n\n${formatDocumentationForApi(function.introduction!)}');
+        sb.write(
+          '\n\n${formatDocumentationForApi(function.introduction!, headingLevel: 5)}',
+        );
       }
       final String returnType = function.returnType ?? 'dynamic';
       sb.write('\n\n返回类型：`$returnType`');
@@ -162,7 +164,7 @@ String renderApiMarkdown(
     }
 
     if (showIntro && introForSummary.isNotEmpty) {
-      sb.write('\n#### 简介\n');
+      sb.write('\n\n');
       sb.write(introForSummary);
     }
     StaticMethodInfo? currentMethod;
@@ -292,7 +294,9 @@ String renderApiMarkdown(
           sb.write('\n\n无参数。');
         }
         if (item.introduction != null && item.introduction!.isNotEmpty) {
-          sb.write('\n\n${formatDocumentationForApi(item.introduction!)}');
+          sb.write(
+            '\n\n${formatDocumentationForApi(item.introduction!, headingLevel: 6)}',
+          );
         }
         final String returnType =
             item.returnType == 'null' ? '' : (item.returnType ?? 'dynamic');
@@ -339,7 +343,8 @@ String renderApiMarkdown(
       );
       sb.write('\n无参数。\n');
       final String docs = apiInfo.componentInfo!.defaultConstructorIntroduction;
-      if (docs.isNotEmpty) sb.write('\n${formatDocumentationForApi(docs)}\n');
+      if (docs.isNotEmpty)
+        sb.write('\n${formatDocumentationForApi(docs, headingLevel: 5)}\n');
     }
     if (apiInfo.propertyList.isNotEmpty) {
       sb.write('\n#### 默认构造方法\n');
@@ -349,7 +354,8 @@ String renderApiMarkdown(
         isExternal: apiInfo.componentInfo!.defaultConstructorIsExternal,
       );
       final docs = apiInfo.componentInfo!.defaultConstructorIntroduction;
-      if (docs.isNotEmpty) sb.write('\n${formatDocumentationForApi(docs)}\n');
+      if (docs.isNotEmpty)
+        sb.write('\n${formatDocumentationForApi(docs, headingLevel: 5)}\n');
       writePropertyTable(
         apiInfo.propertyList,
         header: '参数',

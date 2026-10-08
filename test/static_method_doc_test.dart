@@ -178,7 +178,7 @@ void main() {
             await File(
               p.join(tempDir.path, 'demo_popup_api.md'),
             ).readAsString();
-        expect(content, contains('#### 简介'));
+        expect(content, isNot(contains('#### 简介')));
         expect(content, contains('通过 `show` 命令式打开'));
         expect(content, contains('##### DemoPopup.show'));
         expect(content, contains('打开浮层并压入独立 `PopupRoute`'));
@@ -324,11 +324,11 @@ void main() {
           getComments: true,
         );
 
-        expect(content, contains('#### 简介'));
+        expect(content, isNot(contains('#### 简介')));
         expect(content, contains('第一个组件说明'));
         expect(content, isNot(contains('TypeAlpha.demo()')));
         expect(
-          content.split('#### 简介').last.split('\n#### ').first,
+          content.split('### TypeAlpha').last.split('\n#### ').first,
           isNot(contains('```dart')),
         );
       },

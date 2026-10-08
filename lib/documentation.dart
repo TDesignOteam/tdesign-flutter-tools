@@ -276,7 +276,7 @@ String formatDocumentationForMarkdown(String? raw) {
 ///
 /// 仅在渲染时过滤，不修改解析模型或源码 dartdoc。支持反引号及波浪线
 /// 围栏，包括长围栏中出现短围栏的代码；行内代码和后续说明保持不变。
-String formatDocumentationForApi(String text) {
+String formatDocumentationForApi(String text, {int? headingLevel}) {
   final lines = <String>[];
   String? fenceCharacter;
   var fenceLength = 0;
@@ -302,15 +302,56 @@ String formatDocumentationForApi(String text) {
     }
     if (!exampleLabel.hasMatch(line.trim())) lines.add(line);
   }
-  return lines
+  final prose =
+      headingLevel == null ? lines : _rebaseApiHeadings(lines, headingLevel);
+  return prose
       .join('\n')
       .replaceAll(RegExp(r'\n(?:[ \t]*\n){2,}'), '\n\n')
       .trim();
 }
 
+/// 将注释内部标题置于所属 API 之下，保留相对深度。
+/// API 自身使用三级到五级标题；超出 Markdown 六级的子标题改为加粗。
+List<String> _rebaseApiHeadings(List<String> lines, int headingLevel) {
+  assert(headingLevel >= 1 && headingLevel <= 6);
+  final atx = RegExp(r'^ {0,3}(#{1,6})(?:[ \t]+(.*)|$)');
+  final setext = RegExp(r'^ {0,3}(=+|-+)[ \t]*$');
+  final normalized = <String>[];
+  for (final line in lines) {
+    final underline = setext.firstMatch(line);
+    if (underline != null && normalized.isNotEmpty) {
+      final title = normalized.last;
+      // 不把表格分隔线、列表或引用转换为 setext 标题。
+      if (title.trim().isNotEmpty &&
+          !RegExp(r'^\s*(?:[|>#]|[-+*] |\d+[.)] )').hasMatch(title)) {
+        normalized[normalized.length - 1] =
+            '${underline.group(1)!.startsWith('=') ? '#' : '##'} $title';
+        continue;
+      }
+    }
+    normalized.add(line);
+  }
+  final levels = normalized
+      .map(atx.firstMatch)
+      .whereType<RegExpMatch>()
+      .map((match) => match.group(1)!.length);
+  if (levels.isEmpty) return normalized;
+  final minimum = levels.reduce((a, b) => a < b ? a : b);
+  return normalized.map((line) {
+    final heading = atx.firstMatch(line);
+    if (heading == null) return line;
+    final depth = headingLevel + heading.group(1)!.length - minimum;
+    final title =
+        (heading.group(2) ?? '')
+            .replaceFirst(RegExp(r'[ \t]+#+[ \t]*$'), '')
+            .trim();
+    return depth <= 6 ? '${'#' * depth} $title' : '**$title**';
+  }).toList();
+}
+
 /// 简介与构造、方法正文使用相同的 API 展示规则。
 String formatIntroductionForApiSummary(String text) =>
-    formatDocumentationForApi(text);
+    formatDocumentationForApi(text, headingLevel: 4);
 
 /// 兼容旧工具调用方。
 @Deprecated('Use formatIntroductionForApiSummary instead.')

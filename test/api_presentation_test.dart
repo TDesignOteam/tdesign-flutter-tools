@@ -1,10 +1,144 @@
 import 'package:analyzer/dart/analysis/utilities.dart';
 import 'package:tdesign_flutter_tools/api_markdown.dart';
 import 'package:tdesign_flutter_tools/component_rule.dart';
+import 'package:tdesign_flutter_tools/documentation.dart';
 import 'package:tdesign_flutter_tools/model.dart';
 import 'package:test/test.dart';
 
 void main() {
+  test('type prose headings remain inside their type without intro labels', () {
+    const source = '''
+/// Options.
+///
+/// ## Creation
+///
+/// Named factories are preferred.
+///
+/// ### Details
+///
+/// Null uses the theme.
+///
+/// ## Placement
+///
+/// | Direction | Field |
+/// | --- | --- |
+/// | bottom | height |
+class Options {
+  Options();
+}
+/// Kind.
+///
+/// # Meaning
+/// Choose one kind.
+enum Kind { bottom }
+/// Callback.
+///
+/// ## Timing
+/// Receives the result.
+typedef Result = void Function();
+''';
+    final parsed = <ParsedComponentInfoInfo>[];
+    const names = ['Options', 'Kind', 'Result'];
+    parseString(content: source).unit.accept(
+      ComponentAstVisitor(
+        nameList: names,
+        onParsedComponentInfoInfo: parsed.add,
+      ),
+    );
+    final original = parsed.first.componentInfo!.introduction;
+    final output = renderApiMarkdown(
+      parsed,
+      names: names,
+      includeIntroduction: true,
+    );
+    expect(output, isNot(contains('#### 简介')));
+    expect(output, contains('### Options\n\nOptions.'));
+    for (final heading in [
+      '#### Creation',
+      '##### Details',
+      '#### Placement',
+      '#### Meaning',
+      '#### Timing',
+    ]) {
+      expect(output, contains(heading));
+    }
+    expect(output, contains('| bottom | height |'));
+    expect(parsed.first.componentInfo!.introduction, original);
+    expect(
+      renderApiMarkdown(parsed, names: names, includeIntroduction: true),
+      output,
+    );
+  });
+
+  test('callable prose headings cannot escape their callable section', () {
+    const source = '''
+class Options {
+  /// Default.
+  ///
+  /// ## Defaults
+  /// Null uses the theme.
+  Options();
+  /// Factory.
+  ///
+  /// # Factory behavior
+  /// Uses a fixed direction.
+  factory Options.bottom() => Options();
+  /// Method.
+  ///
+  /// ## Method behavior
+  ///
+  /// ### Nested behavior
+  /// Calling twice has no effect.
+  void close() {}
+}
+/// Function.
+///
+/// ## Function behavior
+/// Returns nothing.
+void run() {}
+''';
+    final parsed = <ParsedComponentInfoInfo>[];
+    const names = ['Options', 'run'];
+    parseString(content: source).unit.accept(
+      ComponentAstVisitor(
+        nameList: names,
+        onParsedComponentInfoInfo: parsed.add,
+      ),
+    );
+    final output = renderApiMarkdown(parsed, names: names);
+    for (final contract in [
+      '##### Defaults',
+      '###### Factory behavior',
+      '###### Method behavior',
+      '**Nested behavior**',
+      '##### Function behavior',
+    ]) {
+      expect(output, contains(contract));
+    }
+    expect(output, isNot(contains('#######')));
+  });
+
+  test('setext headings rebase without converting tables or thematic breaks', () {
+    const source =
+        'Title\n=====\n\nDetails\n-------\n\n| A | B |\n| --- | --- |\n\n---\n\nPlain text.';
+    expect(
+      formatIntroductionForApiSummary(source),
+      '#### Title\n\n##### Details\n\n| A | B |\n| --- | --- |\n\n---\n\nPlain text.',
+    );
+  });
+
+  test(
+    'heading normalization preserves inline hashes and filters code examples',
+    () {
+      const source =
+          'Use `#value`.\n\n```dart\n# code\n```\n\n  ## Behavior ##\n\nC# remains valid.';
+      expect(
+        formatIntroductionForApiSummary(source),
+        'Use `#value`.\n\n#### Behavior\n\nC# remains valid.',
+      );
+    },
+  );
+
   test('constructors retain only positional order and grouping', () {
     const source = '''
 /// Options.
