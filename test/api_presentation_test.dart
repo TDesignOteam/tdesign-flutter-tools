@@ -5,6 +5,39 @@ import 'package:tdesign_flutter_tools/model.dart';
 import 'package:test/test.dart';
 
 void main() {
+  test('constructors retain only positional order and grouping', () {
+    const source = '''
+/// Options.
+class Options {
+  /// Default.
+  const Options({int count = 1});
+  /// Positional and named.
+  factory Options.mixed(int z, {required int a}) => Options();
+  /// Optional positional.
+  Options.optional(int z, [int? a]);
+  /// No arguments.
+  Options.empty();
+}
+''';
+    final parsed = <ParsedComponentInfoInfo>[];
+    parseString(content: source).unit.accept(
+      ComponentAstVisitor(
+        nameList: ['Options'],
+        onParsedComponentInfoInfo: parsed.add,
+      ),
+    );
+    final output = renderApiMarkdown(parsed, names: ['Options']);
+    expect(output, isNot(contains('```')));
+    expect(output, isNot(contains('const Options')));
+    expect(output, isNot(contains('支持 const')));
+    expect(output, contains('##### Options.empty'));
+    expect(output, contains('#### 工厂构造方法'));
+    expect(output, contains('参数形式：`Options.mixed(z, {a})`'));
+    expect(output, contains('参数形式：`Options.optional(z, [a])`'));
+    expect(output, contains('| count | int | 1 |'));
+    expect(output, contains('| a | int | - | - | 是 |'));
+  });
+
   test(
     'API rendering removes examples across callable scopes, retaining contracts',
     () {
@@ -98,14 +131,15 @@ extension Helpers<E extends Object> on List<E?> {
         '类型参数：`E extends Object`',
         '适用类型：`List&lt;E?&gt;`',
         'typedef Result = void Function(int value)',
-        'Options({this.value})',
-        'Options.named(this.value)',
+        '参数形式：`Options.named(value)`',
         'static bool open({required int count})',
         'void close()',
         '| count | int | - |',
       ]) {
         expect(output, contains(contract));
       }
+      expect(output, isNot(contains('Options({this.value})')));
+      expect(output, isNot(contains('Options.named(this.value)')));
       expect(parsed.first.componentInfo!.introduction, originalIntro);
       expect(originalIntro, contains('classExample();'));
       expect(

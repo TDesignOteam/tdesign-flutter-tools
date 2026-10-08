@@ -6,6 +6,48 @@ import 'package:dart_style/dart_style.dart';
 /// Callable syntax, independent of the rendered section title.
 enum ApiCallableKind { method, constructor, factoryConstructor, function }
 
+/// Only positional constructors need a parameter shape beside their table.
+/// Types, defaults and required flags remain in the parameter table.
+String constructorParameterShape(
+  String signature, {
+  required String ownerDeclaration,
+  required ApiCallableKind kind,
+  bool isExternal = false,
+}) {
+  if (signature.isEmpty) return '';
+  final suffix =
+      !isExternal && kind == ApiCallableKind.factoryConstructor
+          ? ' = _DocumentationConstructor;'
+          : ';';
+  final owner =
+      parseString(
+            content: '$ownerDeclaration { $signature$suffix }',
+          ).unit.declarations.single
+          as ClassDeclaration;
+  final constructor = owner.members.single as ConstructorDeclaration;
+  final parameters = constructor.parameters.parameters;
+  if (parameters.every((parameter) => parameter.isNamed)) return '';
+  final required = <String>[];
+  final optional = <String>[];
+  final named = <String>[];
+  for (final parameter in parameters) {
+    final target =
+        parameter.isNamed
+            ? named
+            : parameter.isRequiredPositional
+            ? required
+            : optional;
+    target.add(parameter.name!.lexeme);
+  }
+  final groups = [
+    ...required,
+    if (optional.isNotEmpty) '[${optional.join(', ')}]',
+    if (named.isNotEmpty) '{${named.join(', ')}}',
+  ];
+  final name = constructor.name?.lexeme;
+  return '${owner.name.lexeme}${name == null ? '' : '.$name'}(${groups.join(', ')})';
+}
+
 /// Compact type contract, without a standalone class/extension declaration.
 ({String parameters, String onType}) apiTypeContract(String declaration) {
   if (declaration.isEmpty) return (parameters: '', onType: '');

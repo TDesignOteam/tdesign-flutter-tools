@@ -128,13 +128,15 @@ void main() {
         );
         expect(markdown, contains('##### DemoGeneric.copyWith'));
         expect(markdown, contains('##### DemoGeneric.[]'));
-        expect(markdown, contains('const factory DemoRedirect.fixed('));
+        expect(markdown, contains('##### DemoRedirect.fixed'));
+        expect(markdown, isNot(contains('const factory DemoRedirect.fixed(')));
         expect(markdown, isNot(contains('### UnregisteredEnum')));
         expect(markdown, contains('| canClose | bool |'));
         expect(markdown, contains('##### DemoHelpers.dismiss'));
         expect(markdown, contains('#### 命名构造方法'));
         expect(markdown, contains('#### 工厂构造方法'));
-        expect(markdown, contains('```dart\nDemoController()\n```'));
+        expect(markdown, isNot(contains('```dart\nDemoController()\n```')));
+        expect(markdown, contains('### DemoController\n'));
         expect(markdown, contains('Whether closure is animated.'));
         expect(
           markdown,

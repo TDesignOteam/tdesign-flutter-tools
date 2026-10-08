@@ -182,7 +182,7 @@ $heading
         '''
 class External {
   external External();
-  external External.named();
+  external External.named(int value);
   external factory External.factory();
   external void run();
   external static void invoke();
@@ -191,9 +191,10 @@ class External {
         ['External'],
       );
       for (final signature in [
-        'external External()',
-        'external External.named()',
-        'external factory External.factory()',
+        '#### 默认构造方法',
+        '##### External.named',
+        '参数形式：`External.named(value)`',
+        '##### External.factory',
         'external void run()',
         'external static void invoke()',
       ]) {

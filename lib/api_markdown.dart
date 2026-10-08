@@ -13,7 +13,7 @@ String renderApiMarkdown(
   String fileContent = '''
 ## API
 
-默认值列展示源码声明的默认值；`-` 表示未显式声明。运行时的 Theme / Token 回退见说明，参数是否必填见「必填」列。
+默认值列展示源码声明的默认值；`-` 表示未显式声明。运行时的 Theme / Token 回退见说明，参数是否必填见「必填」列。构造参数默认按名称传入；含位置参数的构造方法另列「参数形式」。
 
 ''';
   StringBuffer sb = StringBuffer(fileContent);
@@ -149,6 +149,19 @@ String renderApiMarkdown(
       bool isExternal = false,
     }) {
       if (signature.isEmpty) return;
+      if (kind == ApiCallableKind.constructor ||
+          kind == ApiCallableKind.factoryConstructor) {
+        final shape = constructorParameterShape(
+          signature,
+          ownerDeclaration: apiInfo.componentInfo!.declaration,
+          kind: kind,
+          isExternal: isExternal,
+        );
+        if (shape.isNotEmpty) {
+          sb.write('\n\n参数形式：`${sanitizeApiType(shape)}`\n');
+        }
+        return;
+      }
       final code = formatApiSignature(
         signature,
         ownerDeclaration: apiInfo.componentInfo!.declaration,
@@ -281,6 +294,11 @@ String renderApiMarkdown(
           kind: item.callableKind,
           isExternal: item.isExternal,
         );
+        if ((item.callableKind == ApiCallableKind.constructor ||
+                item.callableKind == ApiCallableKind.factoryConstructor) &&
+            item.params.isEmpty) {
+          sb.write('\n\n无参数。');
+        }
         if (item.introduction != null && item.introduction!.isNotEmpty) {
           sb.write('\n\n${formatDocumentationForApi(item.introduction!)}');
         }
@@ -327,6 +345,7 @@ String renderApiMarkdown(
         kind: apiInfo.componentInfo!.defaultConstructorKind,
         isExternal: apiInfo.componentInfo!.defaultConstructorIsExternal,
       );
+      sb.write('\n无参数。\n');
       final String docs = apiInfo.componentInfo!.defaultConstructorIntroduction;
       if (docs.isNotEmpty) sb.write('\n${formatDocumentationForApi(docs)}\n');
     }
