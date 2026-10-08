@@ -122,10 +122,9 @@ void main() {
         expect(html, isNot(contains('<String>')));
         expect(markdown, contains('typedef GenericBuilder<T>'));
         expect(markdown, contains('类型参数：`T extends Object`'));
-        expect(
-          markdown,
-          contains('T? read<E extends Object>(E value, [T? fallback])'),
-        );
+        expect(markdown, contains('位置参数：`value, fallback`'));
+        expect(markdown, contains('类型参数：`E extends Object`'));
+        expect(markdown, contains('返回类型：`T?`'));
         expect(markdown, contains('##### DemoGeneric.copyWith'));
         expect(markdown, contains('##### DemoGeneric.[]'));
         expect(markdown, contains('##### DemoRedirect.fixed'));

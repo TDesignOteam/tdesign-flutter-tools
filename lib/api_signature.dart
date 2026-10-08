@@ -6,46 +6,57 @@ import 'package:dart_style/dart_style.dart';
 /// Callable syntax, independent of the rendered section title.
 enum ApiCallableKind { method, constructor, factoryConstructor, function }
 
-/// Only positional constructors need a parameter shape beside their table.
-/// Types, defaults and required flags remain in the parameter table.
-String constructorParameterShape(
+/// Compact callable contract shared by constructors, methods and functions.
+/// Tables carry types/defaults; only positional calls need a parameter shape.
+({String shape, String typeParameters}) apiCallableContract(
   String signature, {
-  required String ownerDeclaration,
-  required ApiCallableKind kind,
+  String ownerDeclaration = '',
+  ApiCallableKind kind = ApiCallableKind.method,
   bool isExternal = false,
 }) {
-  if (signature.isEmpty) return '';
+  if (signature.isEmpty) return (shape: '', typeParameters: '');
   final suffix =
-      !isExternal && kind == ApiCallableKind.factoryConstructor
+      isExternal || kind == ApiCallableKind.constructor
+          ? ';'
+          : kind == ApiCallableKind.factoryConstructor
           ? ' = _DocumentationConstructor;'
-          : ';';
+          : ' => throw UnimplementedError();';
   final owner =
       parseString(
-            content: '$ownerDeclaration { $signature$suffix }',
-          ).unit.declarations.single
-          as ClassDeclaration;
-  final constructor = owner.members.single as ConstructorDeclaration;
-  final parameters = constructor.parameters.parameters;
-  if (parameters.every((parameter) => parameter.isNamed)) return '';
-  final required = <String>[];
-  final optional = <String>[];
-  final named = <String>[];
-  for (final parameter in parameters) {
-    final target =
-        parameter.isNamed
-            ? named
-            : parameter.isRequiredPositional
-            ? required
-            : optional;
-    target.add(parameter.name!.lexeme);
+        content:
+            ownerDeclaration.isEmpty
+                ? '$signature$suffix'
+                : '$ownerDeclaration { $signature$suffix }',
+      ).unit.declarations.single;
+  final callable =
+      owner is ClassDeclaration
+          ? owner.members.single
+          : owner is ExtensionDeclaration
+          ? owner.members.single
+          : owner;
+  final FormalParameterList parameters;
+  final TypeParameterList? typeParameters;
+  if (callable is ConstructorDeclaration) {
+    parameters = callable.parameters;
+    typeParameters = null;
+  } else if (callable is MethodDeclaration) {
+    parameters = callable.parameters!;
+    typeParameters = callable.typeParameters;
+  } else {
+    final function = callable as FunctionDeclaration;
+    parameters = function.functionExpression.parameters!;
+    typeParameters = function.functionExpression.typeParameters;
   }
-  final groups = [
-    ...required,
-    if (optional.isNotEmpty) '[${optional.join(', ')}]',
-    if (named.isNotEmpty) '{${named.join(', ')}}',
-  ];
-  final name = constructor.name?.lexeme;
-  return '${owner.name.lexeme}${name == null ? '' : '.$name'}(${groups.join(', ')})';
+  final positional = parameters.parameters
+      .where((parameter) => !parameter.isNamed)
+      .map((parameter) => parameter.name!.lexeme)
+      .join(', ');
+  return (
+    shape: positional,
+    typeParameters:
+        typeParameters?.typeParameters.map((p) => p.toSource()).join(', ') ??
+        '',
+  );
 }
 
 /// Compact type contract, without a standalone class/extension declaration.

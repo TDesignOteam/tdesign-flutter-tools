@@ -193,10 +193,11 @@ class External {
       for (final signature in [
         '#### 默认构造方法',
         '##### External.named',
-        '参数形式：`External.named(value)`',
+        '位置参数：`value`',
         '##### External.factory',
-        'external void run()',
-        'external static void invoke()',
+        '##### External.run',
+        '##### External.invoke',
+        '返回类型：`void`',
       ]) {
         expect(markdown, contains(signature));
       }

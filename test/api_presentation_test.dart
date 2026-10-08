@@ -32,11 +32,55 @@ class Options {
     expect(output, isNot(contains('支持 const')));
     expect(output, contains('##### Options.empty'));
     expect(output, contains('#### 工厂构造方法'));
-    expect(output, contains('参数形式：`Options.mixed(z, {a})`'));
-    expect(output, contains('参数形式：`Options.optional(z, [a])`'));
+    expect(output, contains('位置参数：`z`'));
+    expect(output, contains('位置参数：`z, a`'));
     expect(output, contains('| count | int | 1 |'));
     expect(output, contains('| a | int | - | - | 是 |'));
   });
+
+  test(
+    'one compact contract covers static, instance, extension and function APIs',
+    () {
+      const source = """
+class Options {
+  Options();
+  static T? read<T extends Object>(String z, {required T a}) => a;
+  void close([Object? result]) {}
+  void set({required int count}) {}
+}
+extension Helpers on Options {
+  E? find<E extends Object>(E z, [E? a]) => a;
+}
+R? choose<R extends Object>(R z, {required R a}) => a;
+""";
+      final parsed = <ParsedComponentInfoInfo>[];
+      const names = ['Options', 'Helpers', 'choose'];
+      parseString(content: source).unit.accept(
+        ComponentAstVisitor(
+          nameList: names,
+          onParsedComponentInfoInfo: parsed.add,
+        ),
+      );
+      final output = renderApiMarkdown(parsed, names: names);
+      expect(output, isNot(contains('```')));
+      for (final contract in [
+        '位置参数：`z`',
+        '位置参数：`result`',
+        '位置参数：`z, a`',
+        '位置参数：`z`',
+        '类型参数：`T extends Object`',
+        '类型参数：`E extends Object`',
+        '类型参数：`R extends Object`',
+        '返回类型：`T?`',
+        '返回类型：`E?`',
+        '返回类型：`R?`',
+        '| count | int | - | - | 是 |',
+      ]) {
+        expect(output, contains(contract));
+      }
+      expect(output, isNot(contains('位置参数：`Options.set')));
+    },
+  );
 
   test(
     'API rendering removes examples across callable scopes, retaining contracts',
@@ -131,13 +175,20 @@ extension Helpers<E extends Object> on List<E?> {
         '类型参数：`E extends Object`',
         '适用类型：`List&lt;E?&gt;`',
         'typedef Result = void Function(int value)',
-        '参数形式：`Options.named(value)`',
-        'static bool open({required int count})',
-        'void close()',
+        '位置参数：`value`',
+        '##### Options.open',
+        '返回类型：`bool`',
+        '##### Options.close',
+        '返回类型：`void`',
         '| count | int | - |',
       ]) {
         expect(output, contains(contract));
       }
+      expect(output, isNot(contains('static bool open(')));
+      expect(output, isNot(contains('void close()')));
+      expect(output, isNot(contains('int? read()')));
+      expect(output, contains('返回类型：`int?`'));
+      expect(RegExp(r'^```dart', multiLine: true).allMatches(output).length, 1);
       expect(output, isNot(contains('Options({this.value})')));
       expect(output, isNot(contains('Options.named(this.value)')));
       expect(parsed.first.componentInfo!.introduction, originalIntro);

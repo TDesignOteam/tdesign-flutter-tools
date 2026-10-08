@@ -13,7 +13,7 @@ String renderApiMarkdown(
   String fileContent = '''
 ## API
 
-默认值列展示源码声明的默认值；`-` 表示未显式声明。运行时的 Theme / Token 回退见说明，参数是否必填见「必填」列。构造参数默认按名称传入；含位置参数的构造方法另列「参数形式」。
+默认值列展示源码声明的默认值；`-` 表示未显式声明。运行时的 Theme / Token 回退见说明，参数是否必填见「必填」列。参数默认按名称传入；位置参数按列出的顺序传入。
 
 ''';
   StringBuffer sb = StringBuffer(fileContent);
@@ -110,6 +110,28 @@ String renderApiMarkdown(
       continue;
     }
 
+    void writeCallableContract(
+      String signature, {
+      ApiCallableKind kind = ApiCallableKind.method,
+      bool isExternal = false,
+    }) {
+      final contract = apiCallableContract(
+        signature,
+        ownerDeclaration:
+            kind == ApiCallableKind.function
+                ? ''
+                : apiInfo.componentInfo!.declaration,
+        kind: kind,
+        isExternal: isExternal,
+      );
+      if (contract.typeParameters.isNotEmpty) {
+        sb.write('\n\n类型参数：`${sanitizeApiType(contract.typeParameters)}`\n');
+      }
+      if (contract.shape.isNotEmpty) {
+        sb.write('\n\n位置参数：`${sanitizeApiType(contract.shape)}`\n');
+      }
+    }
+
     if (kind == 'function') {
       final StaticMethodInfo? function =
           apiInfo.componentInfo!.topLevelFunction;
@@ -122,8 +144,8 @@ String renderApiMarkdown(
       }
       final String returnType = function.returnType ?? 'dynamic';
       sb.write('\n\n返回类型：`$returnType`');
-      if (function.signature.isNotEmpty)
-        sb.write('\n\n```dart\n${function.signature}\n```\n');
+      writeCallableContract(function.signature, kind: ApiCallableKind.function);
+      if (function.params.isEmpty) sb.write('\n\n无参数。');
       if (function.params.isNotEmpty) {
         sb.write(
           '\n\n#### 参数\n\n'
@@ -143,34 +165,6 @@ String renderApiMarkdown(
       sb.write('\n#### 简介\n');
       sb.write(introForSummary);
     }
-    void writeSignature(
-      String signature, {
-      ApiCallableKind kind = ApiCallableKind.method,
-      bool isExternal = false,
-    }) {
-      if (signature.isEmpty) return;
-      if (kind == ApiCallableKind.constructor ||
-          kind == ApiCallableKind.factoryConstructor) {
-        final shape = constructorParameterShape(
-          signature,
-          ownerDeclaration: apiInfo.componentInfo!.declaration,
-          kind: kind,
-          isExternal: isExternal,
-        );
-        if (shape.isNotEmpty) {
-          sb.write('\n\n参数形式：`${sanitizeApiType(shape)}`\n');
-        }
-        return;
-      }
-      final code = formatApiSignature(
-        signature,
-        ownerDeclaration: apiInfo.componentInfo!.declaration,
-        kind: kind,
-        isExternal: isExternal,
-      );
-      sb.write('\n\n```dart\n$code\n```\n');
-    }
-
     StaticMethodInfo? currentMethod;
 
     void writePropertyTable(
@@ -289,21 +283,19 @@ String renderApiMarkdown(
         sb.write(
           '\n\n##### ${apiInfo.componentInfo!.name}.${sanitizeTableCell(item.name)}',
         );
-        writeSignature(
+        writeCallableContract(
           item.signature,
           kind: item.callableKind,
           isExternal: item.isExternal,
         );
-        if ((item.callableKind == ApiCallableKind.constructor ||
-                item.callableKind == ApiCallableKind.factoryConstructor) &&
-            item.params.isEmpty) {
+        if (item.params.isEmpty) {
           sb.write('\n\n无参数。');
         }
         if (item.introduction != null && item.introduction!.isNotEmpty) {
           sb.write('\n\n${formatDocumentationForApi(item.introduction!)}');
         }
         final String returnType =
-            item.returnType == 'null' ? '' : (item.returnType ?? '');
+            item.returnType == 'null' ? '' : (item.returnType ?? 'dynamic');
         if (includeReturnType && returnType.isNotEmpty) {
           sb.write('\n\n返回类型：`$returnType`');
         }
@@ -340,7 +332,7 @@ String renderApiMarkdown(
     if (apiInfo.componentInfo!.hasDefaultConstructor &&
         apiInfo.propertyList.isEmpty) {
       sb.write('\n#### 默认构造方法\n');
-      writeSignature(
+      writeCallableContract(
         apiInfo.componentInfo!.defaultConstructorSignature,
         kind: apiInfo.componentInfo!.defaultConstructorKind,
         isExternal: apiInfo.componentInfo!.defaultConstructorIsExternal,
@@ -351,7 +343,7 @@ String renderApiMarkdown(
     }
     if (apiInfo.propertyList.isNotEmpty) {
       sb.write('\n#### 默认构造方法\n');
-      writeSignature(
+      writeCallableContract(
         apiInfo.componentInfo!.defaultConstructorSignature,
         kind: apiInfo.componentInfo!.defaultConstructorKind,
         isExternal: apiInfo.componentInfo!.defaultConstructorIsExternal,
