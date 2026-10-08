@@ -145,7 +145,7 @@ String renderApiMarkdown(
       if (function.params.isNotEmpty) {
         sb.write(
           '\n\n#### 参数\n\n'
-          '| 参数 | 类型 | 默认值 | 说明 | 必填 |\n'
+          '| 名称 | 类型 | 默认值 | 说明 | 必传 |\n'
           '| --- | --- | --- | --- | --- |\n',
         );
         for (final PropertyInfo parameter in function.params) {
@@ -234,7 +234,7 @@ String renderApiMarkdown(
         return;
       }
       sb.write('''\n
-| 参数 | 类型 | 默认值 | 说明 | 必填 |
+| 名称 | 类型 | 默认值 | 说明 | 必传 |
 | --- | --- | --- | --- | --- |\n''');
       for (final PropertyInfo param in params) {
         PropertyInfo? forwardedParam;

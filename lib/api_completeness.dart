@@ -299,7 +299,7 @@ Set<String> markdownFunctionParamNames(String section) {
       continue;
     }
     final String name = columns.first.trim();
-    if (name.isNotEmpty && name != '参数') {
+    if (name.isNotEmpty && name != '参数' && name != '名称') {
       names.add(name);
     }
   }
