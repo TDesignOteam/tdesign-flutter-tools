@@ -312,25 +312,22 @@ void main() {
       expect(content, contains('class TypeBeta'));
     });
 
-    test(
-      'with --get-comments writes intro without fenced code blocks',
-      () async {
-        final String content = await _generateFixtureApi(
-          names: <String>['TypeAlpha'],
-          fixtureFile: 'multi_type_intro_fixture.dart',
-          folderName: 'multi_type_intro',
-          getComments: true,
-        );
+    test('with --get-comments preserves intro examples', () async {
+      final String content = await _generateFixtureApi(
+        names: <String>['TypeAlpha'],
+        fixtureFile: 'multi_type_intro_fixture.dart',
+        folderName: 'multi_type_intro',
+        getComments: true,
+      );
 
-        expect(content, contains('#### 简介'));
-        expect(content, contains('第一个组件说明'));
-        expect(content, isNot(contains('TypeAlpha.demo()')));
-        expect(
-          content.split('#### 简介').last.split('\n#### ').first,
-          isNot(contains('```')),
-        );
-      },
-    );
+      expect(content, contains('#### 简介'));
+      expect(content, contains('第一个组件说明'));
+      expect(content, contains('TypeAlpha.demo()'));
+      expect(
+        content.split('#### 简介').last.split('\n#### ').first,
+        contains('```dart'),
+      );
+    });
 
     test('without --get-comments omits intro for all kinds', () async {
       final String content = await _generateFixtureApi(

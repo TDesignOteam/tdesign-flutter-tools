@@ -207,12 +207,13 @@ ParsedDocumentation parseDocumentation(
       final String name = header.group(1)!;
       final String rest = (header.group(2) ?? '').trim();
       paramDocs[name] = rest;
-      // 同行已有说明时不再把后续非 `[param]` 行并入该参数（避免吞掉「返回 …」等正文）。
-      activeParam = rest.isEmpty ? name : null;
+      // 参数说明属于同一 Markdown 段落。直到空行、下一参数或代码围栏
+      // 才结束，正文中的其他 dartdoc 引用也可能位于续行开头。
+      activeParam = name;
       continue;
     }
 
-    if (activeParam != null && !trimmed.startsWith('[')) {
+    if (activeParam != null) {
       final String existing = paramDocs[activeParam!] ?? '';
       paramDocs[activeParam!] =
           existing.isEmpty ? trimmed : '$existing\n$trimmed';
@@ -272,26 +273,13 @@ String formatDocumentationForMarkdown(String? raw) {
   return parseDocumentation(raw).narrative;
 }
 
-/// 简介正文：去掉 `**示例**` 段及所有 fenced 代码块（API 简介不放代码块）。
-String stripIntroductionForApiSummary(String text) {
-  if (text.isEmpty) {
-    return text;
-  }
-  final RegExp exampleWithFence = RegExp(
-    r'(^|\n)\s*\*\*示例\*\*[：:]?\s*\n(?:\s*\n)*\s*```[\s\S]*?```',
-    multiLine: true,
-  );
-  var cleaned = text.replaceAll(exampleWithFence, '\n');
-  cleaned = cleaned.replaceAll(
-    RegExp(r'(^|\n)\s*\*\*示例\*\*[：:]?\s*(?=\n|$)'),
-    '\n',
-  );
-  cleaned = cleaned.replaceAll(
-    RegExp(r'(^|\n)```[\s\S]*?```', multiLine: true),
-    '\n',
-  );
-  while (cleaned.contains('\n\n\n')) {
-    cleaned = cleaned.replaceAll('\n\n\n', '\n\n');
-  }
-  return cleaned.trim();
-}
+/// 保留简介中的正文与示例代码，只去掉首尾空白。
+///
+/// dartdoc 的代码示例也是用户文档；删除围栏会丢失使用方式，并留下孤立的
+/// “示例”或“典型用法”标题。Markdown 渲染器负责呈现完整简介。
+String formatIntroductionForApiSummary(String text) => text.trim();
+
+/// 兼容旧工具调用方；简介现在保留示例代码。
+@Deprecated('Use formatIntroductionForApiSummary instead.')
+String stripIntroductionForApiSummary(String text) =>
+    formatIntroductionForApiSummary(text);

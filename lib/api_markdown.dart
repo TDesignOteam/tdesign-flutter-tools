@@ -29,7 +29,9 @@ String renderApiMarkdown(
     }
     sb.write('### ${apiInfo.componentInfo!.name}');
     final introduction = apiInfo.componentInfo!.introduction ?? '';
-    final String introForSummary = stripIntroductionForApiSummary(introduction);
+    final String introForSummary = formatIntroductionForApiSummary(
+      introduction,
+    );
     final bool showIntro = includeIntroduction;
     final String kind = apiInfo.componentInfo?.kind ?? 'class';
 
