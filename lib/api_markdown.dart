@@ -10,13 +10,7 @@ String renderApiMarkdown(
   bool strictNames = false,
   bool includeIntroduction = false,
 }) {
-  String fileContent = '''
-## API
-
-默认值列展示源码声明的默认值；`-` 表示未显式声明。运行时的 Theme / Token 回退见说明，参数是否必填见「必填」列。参数默认按名称传入；位置参数按列出的顺序传入。
-
-''';
-  StringBuffer sb = StringBuffer(fileContent);
+  final StringBuffer sb = StringBuffer('## API\n\n');
   String tableDocumentation(String text) {
     final prose = formatDocumentationForApi(text);
     return sanitizeTableCell(prose.isEmpty ? '-' : prose);
