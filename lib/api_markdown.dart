@@ -3,6 +3,9 @@ import 'documentation.dart';
 import 'model.dart';
 import 'util.dart';
 
+const apiTableHeader = '| 名称 | 类型 | 默认值 | 说明 | 必传 |';
+const apiTableDivider = '| --- | --- | --- | --- | --- |';
+
 /// Render parsed API models without I/O or mutations of the input models.
 String renderApiMarkdown(
   List<ParsedComponentInfoInfo> parsedComponentInfoList, {
@@ -35,8 +38,8 @@ String renderApiMarkdown(
       sb.write('\n\n适用类型：`${sanitizeApiType(typeContract.onType)}`\n');
     }
     final introduction = apiInfo.componentInfo!.introduction ?? '';
-    final String introForSummary = formatIntroductionForApiSummary(
-      introduction,
+    final String introForSummary = _uniformApiTables(
+      formatIntroductionForApiSummary(introduction),
     );
     final bool showIntro = includeIntroduction;
     final String kind = apiInfo.componentInfo?.kind ?? 'class';
@@ -48,44 +51,20 @@ String renderApiMarkdown(
       }
       final List<EnumMemberInfo> enumMembers =
           apiInfo.componentInfo!.enumMembers;
-      final bool isSimpleEnum =
-          apiInfo.componentInfo!.isSimpleEnum && !showIntro;
-      if (enumMembers.isNotEmpty) {
-        sb.write('\n#### 枚举值\n');
-        if (isSimpleEnum) {
-          sb.write('''\n
-| 名称 |
-| --- |\n''');
-          for (final EnumMemberInfo member in enumMembers) {
-            sb.write('| ${sanitizeTableCell(member.name)} |\n');
-          }
-        } else {
-          sb.write('''\n
-| 名称 | 说明 |
-| --- | --- |\n''');
-          for (final EnumMemberInfo member in enumMembers) {
-            final String doc =
-                member.introduction.isEmpty ? '-' : member.introduction;
+      if (enumMembers.isNotEmpty ||
+          apiInfo.componentInfo!.enumValues.isNotEmpty) {
+        sb.write('\n#### 枚举值\n\n$apiTableHeader\n$apiTableDivider\n');
+        final type = sanitizeApiType(apiInfo.componentInfo!.name ?? '-');
+        if (enumMembers.isNotEmpty) {
+          for (final member in enumMembers) {
             sb.write(
-              '| ${sanitizeTableCell(member.name)} | ${tableDocumentation(doc)} |\n',
+              '| ${sanitizeTableCell(member.name)} | $type | - | '
+              '${tableDocumentation(member.introduction)} | - |\n',
             );
           }
-        }
-      } else if (apiInfo.componentInfo!.enumValues.isNotEmpty) {
-        sb.write('\n#### 枚举值\n');
-        if (isSimpleEnum) {
-          sb.write('''\n
-| 名称 |
-| --- |\n''');
-          for (final String value in apiInfo.componentInfo!.enumValues) {
-            sb.write('| ${sanitizeTableCell(value)} |\n');
-          }
         } else {
-          sb.write('''\n
-| 名称 | 说明 |
-| --- | --- |\n''');
-          for (final String value in apiInfo.componentInfo!.enumValues) {
-            sb.write('| ${sanitizeTableCell(value)} | - |\n');
+          for (final value in apiInfo.componentInfo!.enumValues) {
+            sb.write('| ${sanitizeTableCell(value)} | $type | - | - | - |\n');
           }
         }
       }
@@ -93,14 +72,56 @@ String renderApiMarkdown(
     }
 
     if (kind == 'typedef') {
-      if (showIntro && introForSummary.isNotEmpty) {
-        sb.write('\n\n');
-        sb.write(introForSummary);
+      final info = apiInfo.componentInfo!;
+      if (info.typedefDefinition.isEmpty) continue;
+      final contract = apiTypedefContract(info.typedefDefinition);
+      if (contract.parameters.isNotEmpty) {
+        sb.write('\n\n类型参数：`${sanitizeApiType(contract.parameters)}`\n');
       }
-      if (apiInfo.componentInfo!.typedefDefinition.isNotEmpty) {
-        sb.write('\n#### 类型定义\n\n');
-        sb.write('```dart\n${apiInfo.componentInfo!.typedefDefinition}\n```\n');
+      final callback = info.typedefFunction;
+      if (callback == null) {
+        sb.write(
+          '\n\n#### 类型定义\n\n$apiTableHeader\n$apiTableDivider\n'
+          '| ${sanitizeTableCell(info.name)} | ${sanitizeApiType(contract.target)} | - | ${tableDocumentation(introduction)} | - |\n',
+        );
+        continue;
       }
+      final documentation = splitApiReturnDocumentation(
+        formatDocumentationForApi(callback.introduction ?? ''),
+      );
+      if (showIntro && documentation.narrative.isNotEmpty) {
+        sb.write(
+          '\n\n${_uniformApiTables(formatIntroductionForApiSummary(documentation.narrative))}',
+        );
+      }
+      if (contract.callbackParameters.isNotEmpty) {
+        sb.write(
+          '\n\n回调类型参数：`${sanitizeApiType(contract.callbackParameters)}`\n',
+        );
+      }
+      if (contract.nullable) sb.write('\n\n可空：是。\n');
+      final positional = callback.params
+          .where((parameter) => !parameter.isNamed)
+          .map((parameter) => parameter.name)
+          .join(', ');
+      if (positional.isNotEmpty) {
+        sb.write('\n\n位置参数：`${sanitizeApiType(positional)}`\n');
+      }
+      sb.write('\n\n#### 回调参数\n\n');
+      if (callback.params.isEmpty) {
+        sb.write('无参数。\n');
+      } else {
+        sb.write('$apiTableHeader\n$apiTableDivider\n');
+        for (final parameter in callback.params) {
+          sb.write(
+            '| ${sanitizeTableCell(parameter.name)} | ${sanitizeApiType(parameter.type)} | ${sanitizeApiType(parameter.defaultValue)} | ${tableDocumentation(parameter.introduction)} | ${parameter.isRequired ? '是' : '否'} |\n',
+          );
+        }
+      }
+      sb.write(
+        '\n\n#### 返回值\n\n$apiTableHeader\n$apiTableDivider\n'
+        '| 返回值 | ${sanitizeApiType(callback.returnType ?? 'dynamic')} | - | ${tableDocumentation(documentation.returns)} | - |\n',
+      );
       continue;
     }
 
@@ -126,6 +147,15 @@ String renderApiMarkdown(
       }
     }
 
+    void writeReturnValue(String type, String description, {int level = 6}) {
+      if (type == 'void') return;
+      sb.write(
+        '\n\n${'#' * level} 返回值\n\n'
+        '$apiTableHeader\n$apiTableDivider\n'
+        '| 返回值 | ${sanitizeApiType(type)} | - | ${tableDocumentation(description)} | - |\n',
+      );
+    }
+
     if (kind == 'function') {
       final StaticMethodInfo? function =
           apiInfo.componentInfo!.topLevelFunction;
@@ -133,27 +163,29 @@ String renderApiMarkdown(
         continue;
       }
       sb.write('\n#### 顶层函数');
-      if (function.introduction?.isNotEmpty ?? false) {
+      final documentation = splitApiReturnDocumentation(
+        formatDocumentationForApi(function.introduction ?? ''),
+      );
+      if (documentation.narrative.isNotEmpty) {
         sb.write(
-          '\n\n${formatDocumentationForApi(function.introduction!, headingLevel: 5)}',
+          '\n\n${_uniformApiTables(formatDocumentationForApi(documentation.narrative, headingLevel: 5))}',
         );
       }
-      final String returnType = function.returnType ?? 'dynamic';
-      sb.write('\n\n返回类型：`$returnType`');
       writeCallableContract(function.signature, kind: ApiCallableKind.function);
       if (function.params.isEmpty) sb.write('\n\n无参数。');
       if (function.params.isNotEmpty) {
-        sb.write(
-          '\n\n#### 参数\n\n'
-          '| 名称 | 类型 | 默认值 | 说明 | 必传 |\n'
-          '| --- | --- | --- | --- | --- |\n',
-        );
+        sb.write('\n\n#### 参数\n\n$apiTableHeader\n$apiTableDivider\n');
         for (final PropertyInfo parameter in function.params) {
           sb.write(
             '| ${sanitizeTableCell(parameter.name)} | ${sanitizeApiType(parameter.type.isEmpty ? '-' : parameter.type)} | ${sanitizeApiType(parameter.defaultValue)} | ${tableDocumentation(parameter.introduction)} | ${parameter.isRequired ? '是' : '否'} |\n',
           );
         }
       }
+      writeReturnValue(
+        function.returnType ?? 'dynamic',
+        documentation.returns,
+        level: 4,
+      );
       continue;
     }
 
@@ -166,18 +198,17 @@ String renderApiMarkdown(
     void writePropertyTable(
       List<PropertyInfo> items, {
       required String header,
-      String nameColumn = '参数',
     }) {
       if (items.isEmpty) {
         return;
       }
       sb.write('\n\n#### $header');
       sb.write('''\n
-| $nameColumn | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- |\n''');
+$apiTableHeader
+$apiTableDivider\n''');
       for (final PropertyInfo item in items) {
         sb.write(
-          '''| ${sanitizeTableCell(item.name)} | ${sanitizeApiType(item.type.isEmpty ? '-' : item.type)} | ${sanitizeApiType(item.defaultValue)} | ${tableDocumentation(item.introduction)} |\n''',
+          '''| ${sanitizeTableCell(item.name)} | ${sanitizeApiType(item.type.isEmpty ? '-' : item.type)} | ${sanitizeApiType(item.defaultValue)} | ${tableDocumentation(item.introduction)} | - |\n''',
         );
       }
     }
@@ -234,8 +265,8 @@ String renderApiMarkdown(
         return;
       }
       sb.write('''\n
-| 名称 | 类型 | 默认值 | 说明 | 必传 |
-| --- | --- | --- | --- | --- |\n''');
+$apiTableHeader
+$apiTableDivider\n''');
       for (final PropertyInfo param in params) {
         PropertyInfo? forwardedParam;
         if (currentMethod != null) {
@@ -285,17 +316,22 @@ String renderApiMarkdown(
         if (item.params.isEmpty) {
           sb.write('\n\n无参数。');
         }
-        if (item.introduction != null && item.introduction!.isNotEmpty) {
+        final prose = formatDocumentationForApi(item.introduction ?? '');
+        final documentation =
+            includeReturnType
+                ? splitApiReturnDocumentation(prose)
+                : (narrative: prose, returns: '');
+        if (documentation.narrative.isNotEmpty) {
           sb.write(
-            '\n\n${formatDocumentationForApi(item.introduction!, headingLevel: 6)}',
+            '\n\n${_uniformApiTables(formatDocumentationForApi(documentation.narrative, headingLevel: 6))}',
           );
         }
+        writeMethodParamTable(item.params);
         final String returnType =
             item.returnType == 'null' ? '' : (item.returnType ?? 'dynamic');
         if (includeReturnType && returnType.isNotEmpty) {
-          sb.write('\n\n返回类型：`$returnType`');
+          writeReturnValue(returnType, documentation.returns);
         }
-        writeMethodParamTable(item.params);
       }
       currentMethod = null;
     }
@@ -317,16 +353,8 @@ String renderApiMarkdown(
       ),
     ];
     writeMethodDetails(constructors, header: '构造方法');
-    writePropertyTable(
-      apiInfo.extraPropertyList,
-      header: '属性',
-      nameColumn: '属性',
-    );
-    writePropertyTable(
-      apiInfo.staticMemberList,
-      header: '静态成员',
-      nameColumn: '名称',
-    );
+    writePropertyTable(apiInfo.extraPropertyList, header: '属性');
+    writePropertyTable(apiInfo.staticMemberList, header: '静态成员');
     writeMethodDetails(
       apiInfo.componentInfo!.staticMethodList,
       header: '静态方法',
@@ -339,4 +367,77 @@ String renderApiMarkdown(
     );
   }
   return sb.toString();
+}
+
+/// Preserve authored table relationships within the shared API columns.
+String _uniformApiTables(String markdown) {
+  List<String> cells(String line) {
+    final result = <String>[];
+    final cell = StringBuffer();
+    var slashes = 0;
+    for (var i = 1; i < line.length - 1; i++) {
+      final char = line[i];
+      if (char == '|' && slashes.isEven) {
+        result.add(cell.toString().trim());
+        cell.clear();
+      } else {
+        cell.write(char);
+      }
+      slashes = char == r'\' ? slashes + 1 : 0;
+    }
+    result.add(cell.toString().trim());
+    return result;
+  }
+
+  final lines = markdown.split('\n');
+  final result = <String>[];
+  var inCode = false;
+  for (var i = 0; i < lines.length; i++) {
+    final line = lines[i];
+    if (line.trimLeft().startsWith('```')) inCode = !inCode;
+    if (inCode ||
+        !line.startsWith('|') ||
+        i + 1 >= lines.length ||
+        !cells(
+          lines[i + 1],
+        ).every((cell) => RegExp(r'^:?-+:?$').hasMatch(cell))) {
+      result.add(line);
+      continue;
+    }
+    final headers = cells(line);
+    result.addAll([
+      '<!-- api-table: details -->',
+      apiTableHeader,
+      apiTableDivider,
+    ]);
+    i++;
+    while (i + 1 < lines.length && lines[i + 1].startsWith('|')) {
+      final row = cells(lines[++i]);
+      if (row.length != headers.length) {
+        throw FormatException(
+          'API table column count does not match its header',
+          lines[i],
+        );
+      }
+      if (line == apiTableHeader) {
+        result.add(lines[i]);
+        continue;
+      }
+      final description = <String>[];
+      for (var j = 1; j < row.length; j++) {
+        description.add(
+          headers[j] == '说明' || headers[j] == '行为' || headers[j] == '结果'
+              ? row[j]
+              : '${headers[j]}：${row[j]}',
+        );
+      }
+      final name =
+          RegExp(r'^[a-z][a-zA-Z0-9_]*$').hasMatch(headers.first)
+              ? '${headers.first}：${row.first}'
+              : row.first;
+      final details = description.isEmpty ? '-' : description.join('；');
+      result.add('| $name | - | - | $details | - |');
+    }
+  }
+  return result.join('\n');
 }

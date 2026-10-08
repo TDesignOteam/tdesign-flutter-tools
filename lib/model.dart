@@ -97,6 +97,9 @@ class ComponentInfo {
   /// typedef 定义源码（仅 kind == typedef）
   String typedefDefinition = '';
 
+  /// 函数类型别名的参数与说明，沿用可调用成员的数据模型。
+  StaticMethodInfo? typedefFunction;
+
   /// 解析来源文件（用于 folder 模式下检测跨文件重复定义）
   String? sourceFile;
 

@@ -7,6 +7,161 @@ import 'package:tdesign_flutter_tools/model.dart';
 import 'package:test/test.dart';
 
 void main() {
+  test('all API tables share columns while notes cannot supply parameters', () {
+    const source = r"""
+class Fixture {
+  /// Create.
+  ///
+  /// | 名称 | 说明 |
+  /// | --- | --- |
+  /// | count | a\|b |
+  ///
+  /// | 名称 | 类型 | 默认值 | 说明 | 必传 |
+  /// | --- | --- | --- | --- | --- |
+  /// | count | int | - | Authored note. | 是 |
+  Fixture({required int count});
+}
+enum Kind { bottom }
+""";
+    final parsed = <ParsedComponentInfoInfo>[];
+    parseString(content: source).unit.accept(
+      ComponentAstVisitor(
+        nameList: ['Fixture', 'Kind'],
+        onParsedComponentInfoInfo: parsed.add,
+      ),
+    );
+    final output = renderApiMarkdown(parsed, names: ['Fixture', 'Kind']);
+    expect(output, contains(r'| count | - | - | a\|b | - |'));
+    expect(output, contains('| bottom | Kind | - | - | - |'));
+    final section = output.substring(output.indexOf('### Fixture'));
+    expect(markdownDefaultCtorParamNames(section), {'count'});
+    expect(
+      markdownDefaultCtorParamNames(
+        section.replaceFirst('| count | int | - | - | 是 |', ''),
+      ),
+      isEmpty,
+    );
+    expect(
+      RegExp(
+        r'^\| 名称 \| 类型 \| 默认值 \| 说明 \| 必传 \|$',
+        multiLine: true,
+      ).allMatches(output).length,
+      4,
+    );
+  });
+
+  test(
+    'void functions omit return tables without accepting malformed contracts',
+    () {
+      final parsed = <ParsedComponentInfoInfo>[];
+      parseString(content: '/// Finishes.\nvoid finish() {}').unit.accept(
+        ComponentAstVisitor(
+          nameList: ['finish'],
+          onParsedComponentInfoInfo: parsed.add,
+        ),
+      );
+      final output = renderApiMarkdown(parsed, names: ['finish']);
+      expect(output, isNot(contains('返回值')));
+      expect(
+        functionDocumentationIssues(
+          'sample',
+          parsed.single.componentInfo!,
+          output,
+        ),
+        isEmpty,
+      );
+      expect(
+        functionDocumentationIssues(
+          'sample',
+          parsed.single.componentInfo!,
+          '$output\n#### 返回值\n\n| 类型 | 说明 |\n| --- | --- |',
+        ),
+        isNotEmpty,
+      );
+    },
+  );
+
+  test(
+    'return documentation follows parameters and preserves sibling prose',
+    () {
+      const source = """
+class Handle {}
+class Popup {
+  /// Opens a popup.
+  ///
+  /// ## 返回值
+  /// Controls the current popup.
+  ///
+  /// ## Failure
+  /// Throws on invalid options.
+  ///
+  /// [count] Number of popups.
+  static Handle show(int count) => Handle();
+  /// Closes the popup.
+  void close() {}
+}
+/// Selects a value.
+///
+/// ## Returns
+/// The selected value, or null.
+T? choose<T extends Object>(T value) => value;
+""";
+      final parsed = <ParsedComponentInfoInfo>[];
+      const names = ['Popup', 'choose'];
+      parseString(content: source).unit.accept(
+        ComponentAstVisitor(
+          nameList: names,
+          onParsedComponentInfoInfo: parsed.add,
+        ),
+      );
+      final original =
+          parsed.first.componentInfo!.staticMethodList.single.introduction;
+      final output = renderApiMarkdown(parsed, names: names);
+      expect(output, contains('###### 返回值\n\n| 名称 | 类型 | 默认值 | 说明 | 必传 |'));
+      expect(
+        output,
+        contains('| 返回值 | Handle | - | Controls the current popup. | - |'),
+      );
+      expect(output, contains('###### Failure\nThrows on invalid options.'));
+      expect(
+        output.indexOf('| count | int |'),
+        lessThan(output.indexOf('| 返回值 | Handle |')),
+      );
+      expect(output, isNot(contains('| void |')));
+      expect(output, contains('#### 返回值\n\n| 名称 | 类型 | 默认值 | 说明 | 必传 |'));
+      expect(
+        output,
+        contains('| 返回值 | T? | - | The selected value, or null. | - |'),
+      );
+      expect(output, isNot(contains('返回类型：')));
+      expect(
+        parsed.first.componentInfo!.staticMethodList.single.introduction,
+        original,
+      );
+      expect(renderApiMarkdown(parsed, names: names), output);
+      final functionSection = output.substring(output.indexOf('### choose'));
+      expect(
+        functionDocumentationIssues(
+          'sample',
+          parsed.last.componentInfo!,
+          functionSection,
+        ),
+        isEmpty,
+      );
+      expect(
+        functionDocumentationIssues(
+          'sample',
+          parsed.last.componentInfo!,
+          functionSection.replaceFirst(
+            '| 返回值 | T? | - | The selected value, or null. | - |',
+            '| 返回值 | Object? | - | The selected value, or null. | - |',
+          ),
+        ),
+        isNotEmpty,
+      );
+    },
+  );
+
   test('type prose headings remain inside their type without intro labels', () {
     const source = '''
 /// Options.
@@ -63,7 +218,7 @@ typedef Result = void Function();
     ]) {
       expect(output, contains(heading));
     }
-    expect(output, contains('| bottom | height |'));
+    expect(output, contains('| bottom | - | - | Field：height | - |'));
     expect(parsed.first.componentInfo!.introduction, original);
     expect(
       renderApiMarkdown(parsed, names: names, includeIntroduction: true),
@@ -271,9 +426,9 @@ R? choose<R extends Object>(R z, {required R a}) => a;
         '类型参数：`T extends Object`',
         '类型参数：`E extends Object`',
         '类型参数：`R extends Object`',
-        '返回类型：`T?`',
-        '返回类型：`E?`',
-        '返回类型：`R?`',
+        '| 返回值 | T? | - | - | - |',
+        '| 返回值 | E? | - | - | - |',
+        '| 返回值 | R? | - | - | - |',
         '| count | int | - | - | 是 |',
       ]) {
         expect(output, contains(contract));
@@ -374,12 +529,11 @@ extension Helpers<E extends Object> on List<E?> {
         '类型参数：`T extends Object`',
         '类型参数：`E extends Object`',
         '适用类型：`List&lt;E?&gt;`',
-        'typedef Result = void Function(int value)',
+        '| value | int | - | - | 是 |',
         '位置参数：`value`',
         '##### Options.open',
-        '返回类型：`bool`',
+        '| 返回值 | bool | - | - | - |',
         '##### Options.close',
-        '返回类型：`void`',
         '| count | int | - |',
       ]) {
         expect(output, contains(contract));
@@ -387,8 +541,8 @@ extension Helpers<E extends Object> on List<E?> {
       expect(output, isNot(contains('static bool open(')));
       expect(output, isNot(contains('void close()')));
       expect(output, isNot(contains('int? read()')));
-      expect(output, contains('返回类型：`int?`'));
-      expect(RegExp(r'^```dart', multiLine: true).allMatches(output).length, 1);
+      expect(output, contains('| 返回值 | int? | - | - | - |'));
+      expect(RegExp(r'^```dart', multiLine: true).allMatches(output), isEmpty);
       expect(output, isNot(contains('Options({this.value})')));
       expect(output, isNot(contains('Options.named(this.value)')));
       expect(parsed.first.componentInfo!.introduction, originalIntro);

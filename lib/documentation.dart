@@ -349,6 +349,32 @@ List<String> _rebaseApiHeadings(List<String> lines, int headingLevel) {
   }).toList();
 }
 
+/// Separate an authored return-value section from the callable narrative.
+/// Code fences/examples have already been filtered by the API formatter.
+({String narrative, String returns}) splitApiReturnDocumentation(String text) {
+  final heading = RegExp(r'^ {0,3}(#{1,6})[ \t]+(.+)$', multiLine: true);
+  final headings = heading.allMatches(text).toList();
+  final index = headings.indexWhere(
+    (match) => RegExp(
+      r'^(?:返回值|returns?|return value)[ \t]*(?:#+[ \t]*)?$',
+      caseSensitive: false,
+    ).hasMatch(match.group(2)!),
+  );
+  if (index < 0) return (narrative: text, returns: '');
+  final start = headings[index];
+  final depth = start.group(1)!.length;
+  final following = headings
+      .skip(index + 1)
+      .where((match) => match.group(1)!.length <= depth);
+  final end = following.isEmpty ? text.length : following.first.start;
+  return (
+    narrative:
+        '${text.substring(0, start.start).trimRight()}\n\n${text.substring(end).trimLeft()}'
+            .trim(),
+    returns: text.substring(start.end, end).trim(),
+  );
+}
+
 /// 简介与构造、方法正文使用相同的 API 展示规则。
 String formatIntroductionForApiSummary(String text) =>
     formatDocumentationForApi(text, headingLevel: 4);

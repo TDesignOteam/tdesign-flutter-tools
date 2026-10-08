@@ -215,7 +215,7 @@ void main() {
           await File(p.join(tempDir.path, 'demo_popup_api.md')).readAsString();
       expect(content, contains('#### 静态方法'));
       expect(content, contains('##### DemoPopup.show'));
-      expect(content, contains('返回类型：`DemoHandle`'));
+      expect(content, contains('| DemoHandle | - |'));
       expect(
         content,
         contains('| context | Object | - | 用于查找 `Navigator` 并展示浮层。 |'),

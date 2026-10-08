@@ -3,6 +3,27 @@ import 'package:ansicolor/ansicolor.dart';
 
 import 'model.dart';
 
+/// Split Markdown cells without treating escaped pipes as delimiters.
+List<String> apiTableCells(String line) {
+  final cells = <String>[];
+  var start = 1;
+  for (var index = 1; index < line.length; index++) {
+    if (line[index] != '|') continue;
+    var slashes = 0;
+    for (
+      var previous = index - 1;
+      previous >= 0 && line[previous] == r'\';
+      previous--
+    ) {
+      slashes++;
+    }
+    if (slashes.isOdd) continue;
+    cells.add(line.substring(start, index).trim());
+    start = index + 1;
+  }
+  return cells;
+}
+
 // 驼峰转下划线
 String CamelToUnderline(String input) {
   RegExp exp = RegExp(r'(?<=[a-z])[A-Z]');

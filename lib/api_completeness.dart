@@ -3,8 +3,10 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import 'api_signature.dart';
 import 'model.dart';
 import 'smart_create.dart';
+import 'util.dart';
 
 /// 完备性检测条目
 class CompletenessIssue {
@@ -224,11 +226,31 @@ String _defaultConstructorBlock(String section) {
   return result.join('\n');
 }
 
+/// Filter presentation-only rows before checking parameter contracts.
+Iterable<String> _contractLines(String block) sync* {
+  var details = false;
+  var inTable = false;
+  for (final line in block.split('\n')) {
+    if (line == '<!-- api-table: details -->') {
+      details = true;
+      continue;
+    }
+    if (line.startsWith('|')) {
+      inTable = true;
+      if (!details) yield line;
+    } else {
+      if (inTable) details = false;
+      inTable = false;
+      yield line;
+    }
+  }
+}
+
 /// 读取「默认构造方法」表格中的参数名（不含公开属性 / 静态成员表）
 Set<String> markdownDefaultCtorParamNames(String section) {
   final String block = _defaultConstructorBlock(section);
   final Set<String> names = <String>{};
-  for (final String line in block.split('\n')) {
+  for (final String line in _contractLines(block)) {
     if (!line.startsWith('|') || line.startsWith('| ---')) {
       continue;
     }
@@ -253,7 +275,7 @@ Set<String> markdownDefaultCtorParamNames(String section) {
 List<String> markdownCtorParamsWithEmptyType(String section) {
   final String block = _defaultConstructorBlock(section);
   final List<String> bad = <String>[];
-  for (final String line in block.split('\n')) {
+  for (final String line in _contractLines(block)) {
     if (!line.startsWith('|') || line.startsWith('| ---')) {
       continue;
     }
@@ -286,7 +308,7 @@ Set<String> markdownFunctionParamNames(String section) {
   final String block =
       section.split(header).skip(1).first.split(RegExp(r'\n#### ')).first;
   final Set<String> names = <String>{};
-  for (final String line in block.split('\n')) {
+  for (final String line in _contractLines(block)) {
     if (!line.startsWith('|') || line.startsWith('| ---')) {
       continue;
     }
@@ -304,6 +326,57 @@ Set<String> markdownFunctionParamNames(String section) {
     }
   }
   return names;
+}
+
+/// Read a return contract without borrowing a neighbouring API's table.
+String? markdownReturnType(String section) {
+  final headings =
+      RegExp(
+        r'^#{4,6} 返回值[ \t]*$',
+        multiLine: true,
+      ).allMatches(section).toList();
+  if (headings.isEmpty) {
+    return RegExp(
+      r'^返回类型：`([^`]+)`',
+      multiLine: true,
+    ).firstMatch(section)?.group(1);
+  }
+  if (headings.length != 1) return null;
+  final heading = headings.single;
+  final depth = heading.group(0)!.split(' ').first.length;
+  final tail = section.substring(heading.end);
+  final boundary = RegExp('^#{1,$depth} ', multiLine: true).firstMatch(tail);
+  final block = boundary == null ? tail : tail.substring(0, boundary.start);
+  final lines = block.split('\n');
+  final start = lines.indexWhere(
+    (line) =>
+        line.trim() == '| 类型 | 说明 |' ||
+        line.trim() == '| 名称 | 类型 | 默认值 | 说明 | 必传 |',
+  );
+  if (start < 0) return null;
+  final rows = <List<String>>[];
+  for (final line in lines.skip(start + 1)) {
+    if (!line.startsWith('|') || !line.endsWith('|')) break;
+    final cells =
+        line
+            .substring(1, line.length - 1)
+            .split(RegExp(r'(?<!\\)\|'))
+            .map((cell) => cell.trim())
+            .toList();
+    if (cells.every((cell) => RegExp(r'^:?-+:?$').hasMatch(cell))) continue;
+    rows.add(cells);
+  }
+  if (rows.length != 1) {
+    return null;
+  }
+  final compact = lines[start].trim() == '| 类型 | 说明 |';
+  final row = rows.single;
+  if (compact) {
+    return row.length == 2 ? row.first : null;
+  }
+  return row.length == 5 && row.first == '返回值' && row[2] == '-' && row[4] == '-'
+      ? row[1]
+      : null;
 }
 
 /// 校验一个顶层函数的生成文档是否完整。
@@ -335,13 +408,27 @@ List<CompletenessIssue> functionDocumentationIssues(
       ),
     );
   }
-  if (!section.contains('返回类型：`')) {
+  final returnType = markdownReturnType(section);
+  final hasReturnContract = RegExp(
+    r'^#{4,6} 返回值[ \t]*$|^返回类型：`',
+    multiLine: true,
+  ).hasMatch(section);
+  if (!(signature.returnType == 'void' && !hasReturnContract) &&
+      (returnType == null ||
+          returnType
+                  .replaceAll('&lt;', '<')
+                  .replaceAll('&gt;', '>')
+                  .replaceAll(RegExp(r'\s+'), '') !=
+              (signature.returnType ?? 'dynamic').replaceAll(
+                RegExp(r'\s+'),
+                '',
+              ))) {
     issues.add(
       CompletenessIssue(
         component: componentKey,
         level: 'ERROR',
         category: 'tool',
-        message: '顶层函数 $functionName 缺少返回类型',
+        message: '顶层函数 $functionName 缺少或错误的返回类型',
       ),
     );
   }
@@ -375,6 +462,86 @@ List<CompletenessIssue> functionDocumentationIssues(
     );
   }
   return issues;
+}
+
+/// Check structured alias tables without borrowing presentation-only rows.
+List<CompletenessIssue> typedefDocumentationIssues(
+  String componentKey,
+  ComponentInfo alias,
+  String section,
+) {
+  final failures = <String>[];
+  final contract = apiTypedefContract(alias.typedefDefinition);
+  bool matchesInline(String label, String expected) {
+    final actual = RegExp(
+      '^$label：`([^`]+)`',
+      multiLine: true,
+    ).firstMatch(section)?.group(1);
+    return expected.isEmpty
+        ? actual == null
+        : actual == sanitizeApiType(expected);
+  }
+
+  final rows = <List<String>>[];
+  var inReturns = false;
+  for (final line in _contractLines(section)) {
+    if (line.startsWith('#### 返回值'))
+      inReturns = true;
+    else if (line.startsWith('#### '))
+      inReturns = false;
+    if (!inReturns && line.startsWith('|') && line.endsWith('|')) {
+      final cells = apiTableCells(line);
+      if (cells.isNotEmpty &&
+          cells.first != '名称' &&
+          cells.first.replaceAll('-', '').isNotEmpty)
+        rows.add(cells);
+    }
+  }
+  if (!matchesInline('类型参数', contract.parameters)) failures.add('类型参数');
+  final callback = alias.typedefFunction;
+  if (callback == null) {
+    if (rows.length != 1 ||
+        rows.single.length != 5 ||
+        rows.single[0] != alias.name ||
+        rows.single[1] != sanitizeApiType(contract.target) ||
+        rows.single[2] != '-' ||
+        rows.single[4] != '-')
+      failures.add('目标类型');
+  } else {
+    final shape = callback.params
+        .where((parameter) => !parameter.isNamed)
+        .map((parameter) => parameter.name)
+        .join(', ');
+    if (!section.contains('#### 回调参数\n')) failures.add('回调参数');
+    if (!matchesInline('位置参数', shape)) failures.add('位置参数');
+    if (!matchesInline('回调类型参数', contract.callbackParameters))
+      failures.add('回调类型参数');
+    if (section.contains('可空：是。') != contract.nullable) failures.add('可空性');
+    if (markdownReturnType(section) !=
+        sanitizeApiType(callback.returnType ?? 'dynamic'))
+      failures.add('返回值');
+    if (rows.length != callback.params.length) failures.add('参数数量');
+    for (var index = 0; index < callback.params.length; index++) {
+      final parameter = callback.params[index];
+      if (index >= rows.length ||
+          rows[index].length != 5 ||
+          rows[index][0] != parameter.name ||
+          rows[index][1] != sanitizeApiType(parameter.type) ||
+          rows[index][2] != sanitizeApiType(parameter.defaultValue) ||
+          rows[index][4] != (parameter.isRequired ? '是' : '否'))
+        failures.add('参数 ${parameter.name}');
+    }
+  }
+  return failures
+      .map(
+        (failure) => CompletenessIssue(
+          component: componentKey,
+          level: 'ERROR',
+          category: 'tool',
+          message: 'typedef ${alias.name} 缺少或错误的$failure',
+        ),
+      )
+      .toList();
 }
 
 /// 跨文件重复 enum/typedef（返回 issue，不打印）
@@ -569,16 +736,13 @@ Future<List<CompletenessIssue>> auditComponent({
     }
 
     if (kind == 'typedef') {
-      if (!section.contains('#### 类型定义')) {
-        issues.add(
-          CompletenessIssue(
-            component: config.componentKey,
-            level: 'WARN',
-            category: 'tool',
-            message: 'typedef $className 缺少类型定义',
-          ),
-        );
-      }
+      issues.addAll(
+        typedefDocumentationIssues(
+          config.componentKey,
+          info.componentInfo!,
+          section,
+        ),
+      );
       continue;
     }
 

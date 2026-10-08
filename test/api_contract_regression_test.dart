@@ -222,7 +222,6 @@ class External {
         '##### External.factory',
         '##### External.run',
         '##### External.invoke',
-        '返回类型：`void`',
       ]) {
         expect(markdown, contains(signature));
       }

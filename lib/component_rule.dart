@@ -194,6 +194,24 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
         node.documentationComment!.tokens.join('\n'),
       );
     }
+    final type = node.type;
+    if (type is GenericFunctionType) {
+      final callback =
+          StaticMethodInfo()
+            ..name = name
+            ..returnType = type.returnType?.toSource() ?? 'dynamic'
+            ..introduction = node.documentationComment?.tokens.join('\n') ?? '';
+      for (final parameter in type.parameters.parameters) {
+        final property = _buildPropertyFromParameter(parameter);
+        if (property.name.isEmpty) {
+          property.name = '参数 ${callback.params.length + 1}';
+        }
+        callback.params.add(property);
+      }
+      applyCallableDocumentation(callback);
+      componentInfo.typedefFunction = callback;
+      componentInfo.introduction = callback.introduction;
+    }
     _emitParsedInfo(_emptyParsedInfo(componentInfo));
   }
 
