@@ -652,10 +652,19 @@ class ComponentAstVisitor extends RecursiveAstVisitor<void> {
   }) {
     for (final StaticMethodInfo method in methods) {
       for (final PropertyInfo param in method.params) {
+        final bool inheritsCopyField =
+            !inheritParentDefault &&
+            method.name == 'copyWith' &&
+            param.introduction.isEmpty &&
+            (fieldMap[param.name]?.introduction.isNotEmpty ?? false);
         _fillPropertyFromFieldMap(
           param,
           useField: inheritParentDefault || method.name == 'copyWith',
         );
+        if (inheritsCopyField) {
+          // 字段的回退默认值不是 copyWith 调用的空值行为；不推测方法实现。
+          param.introduction = '字段含义：${param.introduction} 调用时的空值行为见方法说明。';
+        }
         if ((param.defaultValue == '-' || param.defaultValue.isEmpty) &&
             inheritParentDefault &&
             _currentClassSuperName != null) {

@@ -27,12 +27,11 @@ String normalizeDocumentationText(String raw) {
   var text = raw;
   if (text.contains('/**') || text.contains('/*')) {
     text = text
-        .replaceAll(RegExp(r'^\s*/\*\*?', multiLine: true), '')
-        .replaceAll(RegExp(r'\*/\s*$', multiLine: true), '')
-        .replaceAll(RegExp(r'^\s*\*\s?', multiLine: true), '');
+        .replaceAll(RegExp(r'^[ \t]*/\*\*?', multiLine: true), '')
+        .replaceAll(RegExp(r'\*/[ \t]*$', multiLine: true), '')
+        .replaceAll(RegExp(r'^[ \t]*\*[ \t]?', multiLine: true), '');
   }
-  text = text.replaceAll(RegExp(r'^\s*///\s?', multiLine: true), '');
-  text = text.replaceAll(RegExp(r'\/{3}\s?'), '');
+  text = text.replaceAll(RegExp(r'^[ \t]*///[ \t]?', multiLine: true), '');
 
   final List<String> lines = <String>[];
   var inFence = false;

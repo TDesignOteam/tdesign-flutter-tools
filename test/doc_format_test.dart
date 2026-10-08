@@ -6,6 +6,19 @@ void main() {
     expect(normalizeDocumentationText('/// 第一行\n/// \n///  第二行'), '第一行\n\n第二行');
   });
 
+  test(
+    'bare dartdoc markers preserve paragraphs and literal slashes in fences',
+    () {
+      const raw =
+          '/// 第一段\n///\n/// 第二段\n///\n'
+          '/// ```dart\n/// final marker = "///";\n/// ```';
+      expect(
+        normalizeDocumentationText(raw),
+        '第一段\n\n第二段\n\n```dart\nfinal marker = "///";\n```',
+      );
+    },
+  );
+
   test('formatDartdocReferencesInProse converts bracket references', () {
     expect(
       formatDartdocReferencesInProse('见 [TPopupOptions.bottom] 与 [Navigator]'),
@@ -88,12 +101,12 @@ final x = [1];
 
   test('parameter paragraphs retain wrapped prose and dartdoc references', () {
     const raw = '''
-打开或重新打开浮层。
-
-[context] 可选。首次调用须能解析 [Navigator]（传入 [context] 或依赖
-[navigatorContext]）；后续可省略，优先复用缓存的 [NavigatorState]。
-
-已展示时调用无副作用。
+/// 打开或重新打开浮层。
+///
+/// [context] 可选。首次调用须能解析 [Navigator]（传入 [context] 或依赖
+/// [navigatorContext]）；后续可省略，优先复用缓存的 [NavigatorState]。
+///
+/// 已展示时调用无副作用。
 ''';
     final result = parseDocumentation(raw, parameterNames: ['context']);
     expect(
