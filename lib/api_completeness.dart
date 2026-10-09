@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import 'api_signature.dart';
 import 'model.dart';
 import 'smart_create.dart';
+import 'theme_documentation.dart';
 import 'util.dart';
 
 /// 完备性检测条目
@@ -719,7 +720,27 @@ Future<List<CompletenessIssue>> auditComponent({
     }
 
     final String kind = info.componentInfo?.kind ?? 'class';
-    final String section = sections[className]!;
+    var section = sections[className]!;
+    if (section.contains('<!-- api-theme: fields -->')) {
+      if (!usesThemeConfigurationTable(
+        info.componentInfo!.declaration,
+        info.componentInfo!.introduction ?? '',
+      )) {
+        issues.add(
+          CompletenessIssue(
+            component: config.componentKey,
+            level: 'ERROR',
+            category: 'tool',
+            message: '$className is not an authored component ThemeExtension',
+          ),
+        );
+        continue;
+      }
+      section = section.replaceFirst(
+        '#### 配置项\n',
+        '#### 构造方法\n\n##### $className\n',
+      );
+    }
 
     if (kind == 'enum') {
       if (!section.contains('#### 枚举值')) {

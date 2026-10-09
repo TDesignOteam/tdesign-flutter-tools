@@ -1,6 +1,7 @@
 import 'api_signature.dart';
 import 'documentation.dart';
 import 'model.dart';
+import 'theme_documentation.dart';
 import 'util.dart';
 
 const apiTableHeader = '| 名称 | 类型 | 默认值 | 说明 | 必传 |';
@@ -25,8 +26,16 @@ String renderApiMarkdown(
               .where((info) => names.contains(info.componentInfo?.name))
               .toList()
           : parsedComponentInfoList;
-  for (final apiInfo in documentedInfos) {
-    if (documentedInfos.indexOf(apiInfo) >= 1) {
+  bool isTheme(ParsedComponentInfoInfo info) => usesThemeConfigurationTable(
+    info.componentInfo!.declaration,
+    info.componentInfo!.introduction ?? '',
+  );
+  final orderedInfos = [
+    ...documentedInfos.where((info) => !isTheme(info)),
+    ...documentedInfos.where(isTheme),
+  ];
+  for (final apiInfo in orderedInfos) {
+    if (orderedInfos.indexOf(apiInfo) >= 1) {
       sb.write('\n\n');
     }
     sb.write('### ${apiInfo.componentInfo!.name}');
@@ -37,7 +46,12 @@ String renderApiMarkdown(
     if (typeContract.onType.isNotEmpty) {
       sb.write('\n\n适用类型：`${sanitizeApiType(typeContract.onType)}`\n');
     }
-    final introduction = apiInfo.componentInfo!.introduction ?? '';
+    final rawIntroduction = apiInfo.componentInfo!.introduction ?? '';
+    final themeConfiguration = usesThemeConfigurationTable(
+      apiInfo.componentInfo!.declaration,
+      rawIntroduction,
+    );
+    final introduction = rawIntroduction.replaceAll(componentThemeCategory, '');
     final String introForSummary = _uniformApiTables(
       formatIntroductionForApiSummary(introduction),
     );
@@ -352,7 +366,18 @@ $apiTableDivider\n''');
         (method) => !isLibraryPrivateNamedConstructor(method.name),
       ),
     ];
-    writeMethodDetails(constructors, header: '构造方法');
+    if (themeConfiguration) {
+      sb.write('\n\n<!-- api-theme: fields -->\n\n#### 配置项\n');
+      currentMethod = constructors.where((item) => item.name == '').firstOrNull;
+      writeMethodParamTable(apiInfo.propertyList);
+      currentMethod = null;
+      writeMethodDetails(
+        constructors.where((item) => item.name != '').toList(),
+        header: '构造方法',
+      );
+    } else {
+      writeMethodDetails(constructors, header: '构造方法');
+    }
     writePropertyTable(apiInfo.extraPropertyList, header: '属性');
     writePropertyTable(apiInfo.staticMemberList, header: '静态成员');
     writeMethodDetails(
@@ -361,7 +386,13 @@ $apiTableDivider\n''');
       includeReturnType: true,
     );
     writeMethodDetails(
-      apiInfo.componentInfo!.instanceMethodList,
+      apiInfo.componentInfo!.instanceMethodList
+          .where(
+            (method) =>
+                !themeConfiguration ||
+                !sharedThemeMethods.contains(method.name),
+          )
+          .toList(),
       header: '实例方法',
       includeReturnType: true,
     );

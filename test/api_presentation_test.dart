@@ -7,6 +7,66 @@ import 'package:tdesign_flutter_tools/model.dart';
 import 'package:test/test.dart';
 
 void main() {
+  test('categorized ThemeExtension shows one configuration table', () {
+    const source = r"""
+/// Component theme.
+/// {@category ComponentTheme}
+@immutable
+class Style extends ThemeExtension<Style> {
+  const Style({this.color, this.width = 2});
+  /// Foreground; null uses the token.
+  final Color? color;
+  /// Stroke width.
+  final double width;
+  Style copyWith({Color? color, double? width}) => this;
+  Style lerp(ThemeExtension<Style>? other, double t) => this;
+  Style merge(Style? other) => this;
+  /// A component-specific operation.
+  /// ## 返回值
+  /// The resolved width.
+  double resolveWidth() => width;
+}
+""";
+    List<ParsedComponentInfoInfo> parse(String text) {
+      final result = <ParsedComponentInfoInfo>[];
+      parseString(content: text).unit.accept(
+        ComponentAstVisitor(
+          nameList: ['Style'],
+          onParsedComponentInfoInfo: result.add,
+        ),
+      );
+      return result;
+    }
+
+    final parsed = parse('$source\nenum Mode { never, always }');
+    final output = renderApiMarkdown(
+      parsed,
+      names: ['Style'],
+      includeIntroduction: true,
+    );
+    expect(output, contains('#### 配置项'));
+    expect(output, contains('Component theme.'));
+    expect(
+      output,
+      contains('| color | Color? | - | Foreground; null uses the token. | 否 |'),
+    );
+    expect(output, contains('| width | double | 2 | Stroke width. | 否 |'));
+    expect(output, isNot(contains('Style.copyWith')));
+    expect(output, isNot(contains('Style.lerp')));
+    expect(output, isNot(contains('Style.merge')));
+    expect(output, contains('Style.resolveWidth'));
+    expect(output, isNot(contains('{@category')));
+    expect(output, isNot(contains('##### Style\n')));
+    expect(output.indexOf('### Mode'), greaterThanOrEqualTo(0));
+    expect(output.indexOf('### Mode'), lessThan(output.indexOf('### Style')));
+    final impostor = renderApiMarkdown(
+      parse(source.replaceFirst('extends ThemeExtension<Style>', '')),
+      names: ['Style'],
+    );
+    expect(impostor, contains('Style.copyWith'));
+    expect(impostor, isNot(contains('#### 配置项')));
+  });
+
   test('all API tables share columns while notes cannot supply parameters', () {
     const source = r"""
 class Fixture {

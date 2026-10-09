@@ -43,6 +43,8 @@
 
    默认与命名构造统一归入「构造方法」，各构造以实际名称使用五级标题，参数表直接展示；属性与方法随后按分组展示。`validate` 同时兼容既有默认构造及参数标题。CI 在 Flutter 3.32.0 与 latest 下运行完整工具单测，包含真实 CLI generate → validate 正例及删参数反例。
 
+组件 ThemeExtension 使用原生 dartdoc `{@category ComponentTheme}` 分类后，生成器将其置于功能 API 之后，用一张配置表展示字段，隐藏共用的 `copyWith` / `lerp` / `merge` 方法表。命名构造、静态方法及专有操作继续展示；全局 Token Theme 保留完整操作，未分类的类型维持普通 API 展示。分类同时要求声明直接继承 ThemeExtension，`validate` 会核查配置表归属。
+
 9. **生成与验收共用消费仓库 `tool/components.json`**
    `validate --component-root ...` 默认验收完整 manifest，支持 file/folder、声明及顶层函数。仍可用 `--config` 指定原有 YAML/JSON 抽测清单；`ERROR` 需为 0，`WARN` 多为 enum 成员缺注释等源码问题。
 
