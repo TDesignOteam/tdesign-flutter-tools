@@ -165,7 +165,7 @@ class ButtonResolver {
           File('${outputDir.path}/button_resolver_api.md').readAsStringSync();
       expect(markdown, contains('##### ButtonResolver.resolve'));
       expect(markdown, contains('Resolves the final style.'));
-      expect(markdown, contains('返回类型：`ButtonStyle`'));
+      expect(markdown, contains('| ButtonStyle | - |'));
       expect(
         markdown,
         contains('| variant | ButtonVariant | - | visual variant. |'),

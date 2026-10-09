@@ -27,12 +27,11 @@ String normalizeDocumentationText(String raw) {
   var text = raw;
   if (text.contains('/**') || text.contains('/*')) {
     text = text
-        .replaceAll(RegExp(r'^\s*/\*\*?', multiLine: true), '')
-        .replaceAll(RegExp(r'\*/\s*$', multiLine: true), '')
-        .replaceAll(RegExp(r'^\s*\*\s?', multiLine: true), '');
+        .replaceAll(RegExp(r'^[ \t]*/\*\*?', multiLine: true), '')
+        .replaceAll(RegExp(r'\*/[ \t]*$', multiLine: true), '')
+        .replaceAll(RegExp(r'^[ \t]*\*[ \t]?', multiLine: true), '');
   }
-  text = text.replaceAll(RegExp(r'^\s*///\s?', multiLine: true), '');
-  text = text.replaceAll(RegExp(r'\/{3}\s?'), '');
+  text = text.replaceAll(RegExp(r'^[ \t]*///[ \t]?', multiLine: true), '');
 
   final List<String> lines = <String>[];
   var inFence = false;
@@ -207,12 +206,13 @@ ParsedDocumentation parseDocumentation(
       final String name = header.group(1)!;
       final String rest = (header.group(2) ?? '').trim();
       paramDocs[name] = rest;
-      // 同行已有说明时不再把后续非 `[param]` 行并入该参数（避免吞掉「返回 …」等正文）。
-      activeParam = rest.isEmpty ? name : null;
+      // 参数说明属于同一 Markdown 段落。直到空行、下一参数或代码围栏
+      // 才结束，正文中的其他 dartdoc 引用也可能位于续行开头。
+      activeParam = name;
       continue;
     }
 
-    if (activeParam != null && !trimmed.startsWith('[')) {
+    if (activeParam != null) {
       final String existing = paramDocs[activeParam!] ?? '';
       paramDocs[activeParam!] =
           existing.isEmpty ? trimmed : '$existing\n$trimmed';
@@ -272,26 +272,114 @@ String formatDocumentationForMarkdown(String? raw) {
   return parseDocumentation(raw).narrative;
 }
 
-/// 简介正文：去掉 `**示例**` 段及所有 fenced 代码块（API 简介不放代码块）。
-String stripIntroductionForApiSummary(String text) {
-  if (text.isEmpty) {
-    return text;
+/// API 正文保留行为契约，完整代码示例由专门的示例页展示。
+///
+/// 仅在渲染时过滤，不修改解析模型或源码 dartdoc。支持反引号及波浪线
+/// 围栏，包括长围栏中出现短围栏的代码；行内代码和后续说明保持不变。
+String formatDocumentationForApi(String text, {int? headingLevel}) {
+  final lines = <String>[];
+  String? fenceCharacter;
+  var fenceLength = 0;
+  final fenceStart = RegExp(r'^ {0,3}(`{3,}|~{3,})(.*)$');
+  final exampleLabel = RegExp(
+    r'^(?:#{1,6}\s+)?(?:\*\*|__)?(?:示例|代码示例|使用示例|用法示例|典型用法|基本用法|用法|例如|examples?|usage examples?|usage)[:：]?(?:\*\*|__)?[:：]?$',
+    caseSensitive: false,
+  );
+  for (final line in text.split('\n')) {
+    if (fenceCharacter != null) {
+      final closing = RegExp(
+        '^ {0,3}${RegExp.escape(fenceCharacter)}{$fenceLength,}[ \\t]*\$',
+      );
+      if (closing.hasMatch(line)) fenceCharacter = null;
+      continue;
+    }
+    final fence = fenceStart.firstMatch(line);
+    if (fence != null &&
+        !(fence.group(1)!.startsWith('`') && fence.group(2)!.contains('`'))) {
+      fenceCharacter = fence.group(1)![0];
+      fenceLength = fence.group(1)!.length;
+      continue;
+    }
+    if (!exampleLabel.hasMatch(line.trim())) lines.add(line);
   }
-  final RegExp exampleWithFence = RegExp(
-    r'(^|\n)\s*\*\*示例\*\*[：:]?\s*\n(?:\s*\n)*\s*```[\s\S]*?```',
-    multiLine: true,
-  );
-  var cleaned = text.replaceAll(exampleWithFence, '\n');
-  cleaned = cleaned.replaceAll(
-    RegExp(r'(^|\n)\s*\*\*示例\*\*[：:]?\s*(?=\n|$)'),
-    '\n',
-  );
-  cleaned = cleaned.replaceAll(
-    RegExp(r'(^|\n)```[\s\S]*?```', multiLine: true),
-    '\n',
-  );
-  while (cleaned.contains('\n\n\n')) {
-    cleaned = cleaned.replaceAll('\n\n\n', '\n\n');
-  }
-  return cleaned.trim();
+  final prose =
+      headingLevel == null ? lines : _rebaseApiHeadings(lines, headingLevel);
+  return prose
+      .join('\n')
+      .replaceAll(RegExp(r'\n(?:[ \t]*\n){2,}'), '\n\n')
+      .trim();
 }
+
+/// 将注释内部标题置于所属 API 之下，保留相对深度。
+/// API 自身使用三级到五级标题；超出 Markdown 六级的子标题改为加粗。
+List<String> _rebaseApiHeadings(List<String> lines, int headingLevel) {
+  assert(headingLevel >= 1 && headingLevel <= 6);
+  final atx = RegExp(r'^ {0,3}(#{1,6})(?:[ \t]+(.*)|$)');
+  final setext = RegExp(r'^ {0,3}(=+|-+)[ \t]*$');
+  final normalized = <String>[];
+  for (final line in lines) {
+    final underline = setext.firstMatch(line);
+    if (underline != null && normalized.isNotEmpty) {
+      final title = normalized.last;
+      // 不把表格分隔线、列表或引用转换为 setext 标题。
+      if (title.trim().isNotEmpty &&
+          !RegExp(r'^\s*(?:[|>#]|[-+*] |\d+[.)] )').hasMatch(title)) {
+        normalized[normalized.length - 1] =
+            '${underline.group(1)!.startsWith('=') ? '#' : '##'} $title';
+        continue;
+      }
+    }
+    normalized.add(line);
+  }
+  final levels = normalized
+      .map(atx.firstMatch)
+      .whereType<RegExpMatch>()
+      .map((match) => match.group(1)!.length);
+  if (levels.isEmpty) return normalized;
+  final minimum = levels.reduce((a, b) => a < b ? a : b);
+  return normalized.map((line) {
+    final heading = atx.firstMatch(line);
+    if (heading == null) return line;
+    final depth = headingLevel + heading.group(1)!.length - minimum;
+    final title =
+        (heading.group(2) ?? '')
+            .replaceFirst(RegExp(r'[ \t]+#+[ \t]*$'), '')
+            .trim();
+    return depth <= 6 ? '${'#' * depth} $title' : '**$title**';
+  }).toList();
+}
+
+/// Separate an authored return-value section from the callable narrative.
+/// Code fences/examples have already been filtered by the API formatter.
+({String narrative, String returns}) splitApiReturnDocumentation(String text) {
+  final heading = RegExp(r'^ {0,3}(#{1,6})[ \t]+(.+)$', multiLine: true);
+  final headings = heading.allMatches(text).toList();
+  final index = headings.indexWhere(
+    (match) => RegExp(
+      r'^(?:返回值|returns?|return value)[ \t]*(?:#+[ \t]*)?$',
+      caseSensitive: false,
+    ).hasMatch(match.group(2)!),
+  );
+  if (index < 0) return (narrative: text, returns: '');
+  final start = headings[index];
+  final depth = start.group(1)!.length;
+  final following = headings
+      .skip(index + 1)
+      .where((match) => match.group(1)!.length <= depth);
+  final end = following.isEmpty ? text.length : following.first.start;
+  return (
+    narrative:
+        '${text.substring(0, start.start).trimRight()}\n\n${text.substring(end).trimLeft()}'
+            .trim(),
+    returns: text.substring(start.end, end).trim(),
+  );
+}
+
+/// 简介与构造、方法正文使用相同的 API 展示规则。
+String formatIntroductionForApiSummary(String text) =>
+    formatDocumentationForApi(text, headingLevel: 4);
+
+/// 兼容旧工具调用方。
+@Deprecated('Use formatIntroductionForApiSummary instead.')
+String stripIntroductionForApiSummary(String text) =>
+    formatIntroductionForApiSummary(text);

@@ -6,6 +6,105 @@ import 'package:dart_style/dart_style.dart';
 /// Callable syntax, independent of the rendered section title.
 enum ApiCallableKind { method, constructor, factoryConstructor, function }
 
+/// Alias metadata that is not carried by parameter/return tables.
+({String parameters, String callbackParameters, String target, bool nullable})
+apiTypedefContract(String definition) {
+  final alias =
+      parseString(content: definition).unit.declarations.single
+          as GenericTypeAlias;
+  final type = alias.type;
+  return (
+    parameters:
+        alias.typeParameters?.typeParameters
+            .map((parameter) => parameter.toSource())
+            .join(', ') ??
+        '',
+    callbackParameters:
+        type is GenericFunctionType
+            ? type.typeParameters?.typeParameters
+                    .map((parameter) => parameter.toSource())
+                    .join(', ') ??
+                ''
+            : '',
+    target: type.toSource(),
+    nullable: type is GenericFunctionType && type.question != null,
+  );
+}
+
+/// Compact callable contract shared by constructors, methods and functions.
+/// Tables carry types/defaults; only positional calls need a parameter shape.
+({String shape, String typeParameters}) apiCallableContract(
+  String signature, {
+  String ownerDeclaration = '',
+  ApiCallableKind kind = ApiCallableKind.method,
+  bool isExternal = false,
+}) {
+  if (signature.isEmpty) return (shape: '', typeParameters: '');
+  final suffix =
+      isExternal || kind == ApiCallableKind.constructor
+          ? ';'
+          : kind == ApiCallableKind.factoryConstructor
+          ? ' = _DocumentationConstructor;'
+          : ' => throw UnimplementedError();';
+  final owner =
+      parseString(
+        content:
+            ownerDeclaration.isEmpty
+                ? '$signature$suffix'
+                : '$ownerDeclaration { $signature$suffix }',
+      ).unit.declarations.single;
+  final callable =
+      owner is ClassDeclaration
+          ? owner.members.single
+          : owner is ExtensionDeclaration
+          ? owner.members.single
+          : owner;
+  final FormalParameterList parameters;
+  final TypeParameterList? typeParameters;
+  if (callable is ConstructorDeclaration) {
+    parameters = callable.parameters;
+    typeParameters = null;
+  } else if (callable is MethodDeclaration) {
+    parameters = callable.parameters!;
+    typeParameters = callable.typeParameters;
+  } else {
+    final function = callable as FunctionDeclaration;
+    parameters = function.functionExpression.parameters!;
+    typeParameters = function.functionExpression.typeParameters;
+  }
+  final positional = parameters.parameters
+      .where((parameter) => !parameter.isNamed)
+      .map((parameter) => parameter.name!.lexeme)
+      .join(', ');
+  return (
+    shape: positional,
+    typeParameters:
+        typeParameters?.typeParameters.map((p) => p.toSource()).join(', ') ??
+        '',
+  );
+}
+
+/// Compact type contract, without a standalone class/extension declaration.
+({String parameters, String onType}) apiTypeContract(String declaration) {
+  if (declaration.isEmpty) return (parameters: '', onType: '');
+  final owner =
+      parseString(content: '$declaration {}').unit.declarations.single;
+  final parameters =
+      owner is ClassDeclaration
+          ? owner.typeParameters
+          : owner is ExtensionDeclaration
+          ? owner.typeParameters
+          : null;
+  return (
+    parameters:
+        parameters?.typeParameters.map((p) => p.toSource()).join(', ') ?? '',
+    onType:
+        owner is ExtensionDeclaration
+            ? owner.onClause?.extendedType.toSource() ?? ''
+            : '',
+  );
+}
+
 /// Format a declaration without changing tokens inside string literals.
 String formatApiSignature(
   String signature, {

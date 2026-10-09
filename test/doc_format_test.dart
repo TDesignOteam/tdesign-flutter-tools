@@ -6,6 +6,19 @@ void main() {
     expect(normalizeDocumentationText('/// 第一行\n/// \n///  第二行'), '第一行\n\n第二行');
   });
 
+  test(
+    'bare dartdoc markers preserve paragraphs and literal slashes in fences',
+    () {
+      const raw =
+          '/// 第一段\n///\n/// 第二段\n///\n'
+          '/// ```dart\n/// final marker = "///";\n/// ```';
+      expect(
+        normalizeDocumentationText(raw),
+        '第一段\n\n第二段\n\n```dart\nfinal marker = "///";\n```',
+      );
+    },
+  );
+
   test('formatDartdocReferencesInProse converts bracket references', () {
     expect(
       formatDartdocReferencesInProse('见 [TPopupOptions.bottom] 与 [Navigator]'),
@@ -86,7 +99,42 @@ final x = [1];
     expect(result.narrative, isEmpty);
   });
 
-  test('stripIntroductionForApiSummary removes 示例 and other fenced blocks', () {
+  test('parameter paragraphs retain wrapped prose and dartdoc references', () {
+    const raw = '''
+/// 打开或重新打开浮层。
+///
+/// [context] 可选。首次调用须能解析 [Navigator]（传入 [context] 或依赖
+/// [navigatorContext]）；后续可省略，优先复用缓存的 [NavigatorState]。
+///
+/// 已展示时调用无副作用。
+''';
+    final result = parseDocumentation(raw, parameterNames: ['context']);
+    expect(
+      result.parameterDocs['context'],
+      '可选。首次调用须能解析 `Navigator`（传入 `context` 或依赖\n'
+      '`navigatorContext`）；后续可省略，优先复用缓存的 `NavigatorState`。',
+    );
+    expect(result.narrative, '打开或重新打开浮层。\n\n已展示时调用无副作用。');
+  });
+
+  test('wrapped parameter paragraphs stop at the next parameter or fence', () {
+    const raw = '''
+[first] 第一参数说明，
+续行。
+[second] 第二参数说明。
+```dart
+final values = [first, second];
+```
+''';
+    final result = parseDocumentation(raw, parameterNames: ['first', 'second']);
+    expect(result.parameterDocs, {
+      'first': '第一参数说明，\n续行。',
+      'second': '第二参数说明。',
+    });
+    expect(result.narrative, contains('final values = [first, second];'));
+  });
+
+  test('API summary omits example labels and fences but retains prose', () {
     const raw = '''
 第一段说明。
 
@@ -97,10 +145,10 @@ final a = 1;
 
 第二段说明。
 ''';
-    expect(stripIntroductionForApiSummary(raw), '第一段说明。\n\n第二段说明。');
+    expect(formatIntroductionForApiSummary(raw), '第一段说明。\n\n第二段说明。');
   });
 
-  test('stripIntroductionForApiSummary removes standalone fenced blocks', () {
+  test('API summary omits standalone fenced examples', () {
     const raw = '''
 第一段说明。
 
@@ -110,7 +158,39 @@ final a = 1;
 
 第二段说明。
 ''';
-    expect(stripIntroductionForApiSummary(raw), '第一段说明。\n\n第二段说明。');
-    expect(stripIntroductionForApiSummary(raw), isNot(contains('```')));
+    expect(formatIntroductionForApiSummary(raw), '第一段说明。\n\n第二段说明。');
   });
+  test(
+    'summary omits the plain example label without losing later constraints',
+    () {
+      const raw = '说明。\n\n示例：\n```dart\nTDivider()\n```\n\n后续契约。';
+      expect(formatIntroductionForApiSummary(raw), '说明。\n\n后续契约。');
+    },
+  );
+
+  test(
+    'API prose preserves inline defaults and handles long and tilde fences',
+    () {
+      const raw = '''
+`null` 保留原值；零时长会关闭。
+
+### 使用示例
+````dart
+final text = '```';
+```
+````
+
+**Examples:**
+~~~dart
+open();
+~~~
+
+不可重复绑定，否则抛出 `StateError`。
+''';
+      expect(
+        formatDocumentationForApi(raw),
+        '`null` 保留原值；零时长会关闭。\n\n不可重复绑定，否则抛出 `StateError`。',
+      );
+    },
+  );
 }

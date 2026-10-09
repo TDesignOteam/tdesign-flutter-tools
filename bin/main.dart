@@ -37,7 +37,7 @@ class CreateCommand extends Command {
     argParser.addFlag(
       'get-comments',
       defaultsTo: false,
-      help: '输出类的 #### 简介（剥离 **示例** 与代码块）；不加则仅生成参数表等结构',
+      help: '输出类的 #### 简介，保留行为说明并隐藏完整代码示例；不加则仅生成参数表等结构',
     );
   }
 

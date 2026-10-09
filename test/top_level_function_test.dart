@@ -79,7 +79,7 @@ void main() {
 
       expect(markdown, contains('### showDemoDrawer'));
       expect(markdown, contains('#### 顶层函数'));
-      expect(markdown, contains('返回类型：`DemoDrawerHandle`'));
+      expect(markdown, contains('| DemoDrawerHandle | - |'));
       expect(markdown, contains('| drawer | DemoDrawer | - | 只描述抽屉内容。 |'));
       expect(
         markdown,

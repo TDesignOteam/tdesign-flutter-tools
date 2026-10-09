@@ -120,21 +120,23 @@ void main() {
         );
         expect(html, contains('<td>List&lt;String&gt;</td>'));
         expect(html, isNot(contains('<String>')));
-        expect(markdown, contains('typedef GenericBuilder<T>'));
-        expect(markdown, contains('class DemoGeneric<T extends Object>'));
-        expect(
-          markdown,
-          contains('T? read<E extends Object>(E value, [T? fallback])'),
-        );
+        expect(markdown, isNot(contains('typedef GenericBuilder<T>')));
+        expect(markdown, contains('#### 回调参数'));
+        expect(markdown, contains('类型参数：`T extends Object`'));
+        expect(markdown, contains('位置参数：`value, fallback`'));
+        expect(markdown, contains('类型参数：`E extends Object`'));
+        expect(markdown, contains('| 返回值 | T? | - | - | - |'));
         expect(markdown, contains('##### DemoGeneric.copyWith'));
         expect(markdown, contains('##### DemoGeneric.[]'));
-        expect(markdown, contains('const factory DemoRedirect.fixed('));
+        expect(markdown, contains('##### DemoRedirect.fixed'));
+        expect(markdown, isNot(contains('const factory DemoRedirect.fixed(')));
         expect(markdown, isNot(contains('### UnregisteredEnum')));
         expect(markdown, contains('| canClose | bool |'));
         expect(markdown, contains('##### DemoHelpers.dismiss'));
-        expect(markdown, contains('#### 命名构造方法'));
-        expect(markdown, contains('#### 工厂构造方法'));
-        expect(markdown, contains('```dart\nDemoController()\n```'));
+        expect(markdown, contains('#### 构造方法'));
+        expect(markdown, contains('##### DemoController\n'));
+        expect(markdown, isNot(contains('```dart\nDemoController()\n```')));
+        expect(markdown, contains('### DemoController\n'));
         expect(markdown, contains('Whether closure is animated.'));
         expect(
           markdown,

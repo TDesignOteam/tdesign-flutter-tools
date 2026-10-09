@@ -178,7 +178,7 @@ void main() {
             await File(
               p.join(tempDir.path, 'demo_popup_api.md'),
             ).readAsString();
-        expect(content, contains('#### 简介'));
+        expect(content, isNot(contains('#### 简介')));
         expect(content, contains('通过 `show` 命令式打开'));
         expect(content, contains('##### DemoPopup.show'));
         expect(content, contains('打开浮层并压入独立 `PopupRoute`'));
@@ -215,7 +215,7 @@ void main() {
           await File(p.join(tempDir.path, 'demo_popup_api.md')).readAsString();
       expect(content, contains('#### 静态方法'));
       expect(content, contains('##### DemoPopup.show'));
-      expect(content, contains('返回类型：`DemoHandle`'));
+      expect(content, contains('| DemoHandle | - |'));
       expect(
         content,
         contains('| context | Object | - | 用于查找 `Navigator` 并展示浮层。 |'),
@@ -308,12 +308,14 @@ void main() {
         r'### TypeAlpha[\s\S]*?\n\n### TypeBeta',
       ).firstMatch(content);
       expect(sectionGap, isNotNull);
-      expect(sectionGap!.group(0), contains('class TypeAlpha'));
-      expect(content, contains('class TypeBeta'));
+      expect(sectionGap!.group(0), contains('#### 构造方法'));
+      expect(content, isNot(contains('const TypeAlpha()')));
+      expect(content, isNot(contains('const TypeBeta()')));
+      expect(content, isNot(contains('#### 声明')));
     });
 
     test(
-      'with --get-comments writes intro without fenced code blocks',
+      'with --get-comments retains prose and omits intro examples',
       () async {
         final String content = await _generateFixtureApi(
           names: <String>['TypeAlpha'],
@@ -322,12 +324,12 @@ void main() {
           getComments: true,
         );
 
-        expect(content, contains('#### 简介'));
+        expect(content, isNot(contains('#### 简介')));
         expect(content, contains('第一个组件说明'));
         expect(content, isNot(contains('TypeAlpha.demo()')));
         expect(
-          content.split('#### 简介').last.split('\n#### ').first,
-          isNot(contains('```')),
+          content.split('### TypeAlpha').last.split('\n#### ').first,
+          isNot(contains('```dart')),
         );
       },
     );

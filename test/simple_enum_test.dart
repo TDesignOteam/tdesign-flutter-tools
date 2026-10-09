@@ -49,59 +49,56 @@ enum TAvatarSize {
     }
   });
 
-  test(
-    'generateApiInfoFile renders simple enum without description column',
-    () async {
-      final Directory tempDir = await Directory.systemTemp.createTemp(
-        'tdesign_simple_enum_doc_',
+  test('generateApiInfoFile renders simple enum with shared columns', () async {
+    final Directory tempDir = await Directory.systemTemp.createTemp(
+      'tdesign_simple_enum_doc_',
+    );
+
+    try {
+      final ComponentInfo componentInfo =
+          ComponentInfo()
+            ..name = 'TAvatarSize'
+            ..kind = 'enum'
+            ..isSimpleEnum = true
+            ..introduction = '头像尺寸';
+      componentInfo.enumMembers.addAll(<EnumMemberInfo>[
+        EnumMemberInfo()..name = 'large',
+        EnumMemberInfo()..name = 'medium',
+        EnumMemberInfo()..name = 'small',
+      ]);
+      componentInfo.enumValues =
+          componentInfo.enumMembers
+              .map((EnumMemberInfo member) => member.name)
+              .toList();
+
+      final ParsedComponentInfoInfo parsed =
+          ParsedComponentInfoInfo()
+            ..componentInfo = componentInfo
+            ..propertyList = <PropertyInfo>[]
+            ..extraPropertyList = <PropertyInfo>[]
+            ..staticMemberList = <PropertyInfo>[]
+            ..fieldMap = <String, PropertyInfo>{};
+
+      final SmartCreator creator = SmartCreator(
+        nameList: <String>['TAvatarSize'],
+        basePath: tempDir.path,
+        folderName: 'avatar',
+        output: '',
+        isFileMode: true,
+        onlyApi: true,
       );
 
-      try {
-        final ComponentInfo componentInfo =
-            ComponentInfo()
-              ..name = 'TAvatarSize'
-              ..kind = 'enum'
-              ..isSimpleEnum = true
-              ..introduction = '头像尺寸';
-        componentInfo.enumMembers.addAll(<EnumMemberInfo>[
-          EnumMemberInfo()..name = 'large',
-          EnumMemberInfo()..name = 'medium',
-          EnumMemberInfo()..name = 'small',
-        ]);
-        componentInfo.enumValues =
-            componentInfo.enumMembers
-                .map((EnumMemberInfo member) => member.name)
-                .toList();
+      await creator.generateApiInfoFile(<ParsedComponentInfoInfo>[parsed]);
 
-        final ParsedComponentInfoInfo parsed =
-            ParsedComponentInfoInfo()
-              ..componentInfo = componentInfo
-              ..propertyList = <PropertyInfo>[]
-              ..extraPropertyList = <PropertyInfo>[]
-              ..staticMemberList = <PropertyInfo>[]
-              ..fieldMap = <String, PropertyInfo>{};
-
-        final SmartCreator creator = SmartCreator(
-          nameList: <String>['TAvatarSize'],
-          basePath: tempDir.path,
-          folderName: 'avatar',
-          output: '',
-          isFileMode: true,
-          onlyApi: true,
-        );
-
-        await creator.generateApiInfoFile(<ParsedComponentInfoInfo>[parsed]);
-
-        final String content =
-            await File(p.join(tempDir.path, 'avatar_api.md')).readAsString();
-        expect(content, contains('### TAvatarSize'));
-        expect(content, contains('| 名称 |'));
-        expect(content, isNot(contains('| 名称 | 说明 |')));
-        expect(content, contains('| large |'));
-        expect(content, isNot(contains('| large | - |')));
-      } finally {
-        await tempDir.delete(recursive: true);
-      }
-    },
-  );
+      final String content =
+          await File(p.join(tempDir.path, 'avatar_api.md')).readAsString();
+      expect(content, contains('### TAvatarSize'));
+      expect(content, contains('| 名称 | 类型 | 默认值 | 说明 | 必传 |'));
+      expect(content, isNot(contains('| 名称 | 说明 |')));
+      expect(content, contains('| large |'));
+      expect(content, contains('| large | TAvatarSize | - | - | - |'));
+    } finally {
+      await tempDir.delete(recursive: true);
+    }
+  });
 }
