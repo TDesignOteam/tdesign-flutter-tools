@@ -282,7 +282,7 @@ String formatDocumentationForApi(String text, {int? headingLevel}) {
   var fenceLength = 0;
   final fenceStart = RegExp(r'^ {0,3}(`{3,}|~{3,})(.*)$');
   final exampleLabel = RegExp(
-    r'^(?:#{1,6}\s+)?(?:\*\*|__)?(?:示例|代码示例|使用示例|用法示例|典型用法|基本用法|例如|examples?|usage examples?)[:：]?(?:\*\*|__)?[:：]?$',
+    r'^(?:#{1,6}\s+)?(?:\*\*|__)?(?:示例|代码示例|使用示例|用法示例|典型用法|基本用法|用法|例如|examples?|usage examples?|usage)[:：]?(?:\*\*|__)?[:：]?$',
     caseSensitive: false,
   );
   for (final line in text.split('\n')) {

@@ -503,7 +503,7 @@ R? choose<R extends Object>(R z, {required R a}) => a;
       const source = '''
 /// Popup configuration.
 ///
-/// **示例**
+/// 用法：
 /// ```dart
 /// classExample();
 /// ```
@@ -580,6 +580,7 @@ extension Helpers<E extends Object> on List<E?> {
       expect(output, isNot(contains('#### 声明')));
       expect(output, isNot(contains('Example();')));
       expect(output, isNot(contains('**示例**')));
+      expect(output, isNot(contains('用法：')));
       for (final contract in [
         'Only one controller',
         'null keeps the default',
